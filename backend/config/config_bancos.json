@@ -1,0 +1,478 @@
+{
+    "config_facta": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Facta",
+        "mapeamento": {
+            "data_pagamento": "DATAEFETIVACAO",
+            "ade": "CODIGO",
+            "vlr_liquido": "VL_LIQUIDO", 
+            "vlr_bruto": "VL_BRUTO",
+            "prazo": "NUMEROPRESTACAO",
+            "cod_tabela": "NR_TABCOM",
+            "tabela": "DS_TABCOM",
+            "data_digitacao": "DATA_CADASTRO",
+            "usuario": "LOGIN_CORRETOR",
+            "cod_corretor": "CORRETOR",
+            "cod_master": "CD_CODIGO_MASTER"
+        },
+            "fixos": {
+            "convenio": null,
+            "produto": null,
+            "banco": "FACTA FINANCEIRA"
+        },
+    "regras": {
+        "cod_indicado": {
+            "colunas_busca": ["COD_INDICADO", "CD_CODIGO_MASTER", "CORRETOR"],
+            "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+            "coluna_codigo": "Cod Loja",
+            "coluna_retorno": "Usuario",
+            "coluna_banco": "Banco",
+            "valor_banco": "FACTA FINANCEIRA"
+            }
+        }
+    },
+    "config_c6": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\C6 Bank",
+        "mapeamento": {
+            "data_pagamento": "Data Base",
+            "ade": "Número da Proposta",
+            "convenio": "Nome Da Entidade",
+            "produto": "Nome do Serviço",
+            "vlr_liquido": "Valor Liberado",
+            "vlr_bruto": "Valor Solicitado Pelo Cliente (BRUTO)",
+            "prazo": "Quantidade de Parcelas do Contrato",
+            "cod_tabela": "Cod Tabela",
+            "tabela": "Desc Tabela",
+            "data_digitacao": "Data da Digitação da ADE",
+            "cod_corretor": "Loja",
+            "cod_master": "Loja",
+            "usuario": "Usuário"
+        },
+    "fixos": {
+        "banco": "BANCO C6 BANK"
+    },
+    "regras": {
+        "cod_indicado": {
+            "colunas_busca": ["Loja"],
+            "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+            "coluna_codigo": "Cod Loja",
+            "coluna_retorno": "Usuario",
+            "coluna_banco": "Banco",
+            "valor_banco": "BANCO C6 BANK"
+            }
+        }
+    },
+    "config_daycoval": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Daycoval",
+
+        "mapeamento": {
+                "data_pagamento": "DATA BASE",
+                "ade": "PROPOSTA",
+                "convenio": "EMPREGADOR",
+                "produto": "TIPO OPERACAO",
+                "vlr_liquido": "PRODUÇÃO P/ EFEITO DE CÁLCULO",
+                "vlr_bruto": "PRODUÇÃO P/ EFEITO DE CÁLCULO",
+                "prazo": "QTD PARCELAS",
+                "cod_tabela": "TABELA",
+                "tabela": "DESCRIÇÃO TABELA",
+                "data_digitacao": "DATA BASE",
+                "cod_corretor": "CÓDIGO PROMOTORA",
+                "cod_master": "CÓDIGO PROMOTORA",
+                "usuario": "CÓDIGO PROMOTORA"
+        },
+
+        "fixos": {
+            "banco": "BANCO DAYCOVAL"
+        },
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["CÓDIGO PROMOTORA"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "BANCO DAYCOVAL"
+            }
+        }
+    },
+    "config_amigoz": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Amigoz",
+
+        "mapeamento": {
+            "data_pagamento": "Data Integração",
+            "ade": "Nr Proposta",
+            "convenio": "Convenio",
+            "vlr_liquido": "Valor Proposta",
+            "vlr_bruto": "Valor Proposta",
+            "prazo": "Qtd Parcelas",
+            "data_digitacao": "Data Cadastro",
+            "cod_corretor": "Corban",
+            "cod_master": "Corban",
+            "usuario": "Usuário Digitador"
+        },
+
+        "fixos": {
+            "produto": "Cartão",
+            "cod_tabela": null,
+            "tabela": null,
+            "banco": "AMIGOZ"
+        },
+
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["Corban"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Nome",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "AMIGOZ"
+            }
+        }
+    },
+    "config_amigoz_emp": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Amigoz - Emp",
+
+        "mapeamento": {
+            "data_pagamento": "Data Atualização",
+            "ade": "Número Proposta",
+            "convenio": "Convênio",
+            "vlr_liquido": "Valor Solicitado",
+            "vlr_bruto": "Valor Solicitado",
+            "prazo": "Quantidade Parcelas",
+            "data_digitacao": "Data Inclusão",
+            "cod_corretor": "Canal Venda",
+            "cod_master": "Canal Venda",
+            "usuario": "CPF Digitador",
+            "cod_tabela": "Taxa CLAW"
+        },
+
+        "fixos": {
+            "produto": "Novo",
+            "tabela": null,
+            "banco": "AMIGOZ"
+        },
+
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["Canal Venda"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Nome",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "AMIGOZ"
+            }
+        }
+    },
+    "config_icred": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Icred",
+
+        "mapeamento": {
+            "data_pagamento": "DAT_EMPRESTIMO",
+            "ade": "NUM_CONTRATO",
+            "convenio": "DSC_CONVENIO",
+            "produto": "DSC_TIPO_PROPOSTA_EMPRESTIMO",
+            "vlr_liquido": "VAL_LIQUIDO",
+            "vlr_bruto": "VAL_BRUTO",
+            "prazo": "QTD_PARCELA",
+            "cod_tabela": "DSC_PRODUTO",
+            "tabela": "DSC_PRODUTO",
+            "data_digitacao": "DAT_EMPRESTIMO",
+            "cod_corretor": "COD_PROMOTORA",
+            "cod_master": "COD_PROMOTORA",
+            "usuario": "NIC_CTR_USUARIO"
+        },
+
+        "fixos": {
+            "banco": "ICRED FINANCEIRA"
+        },
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["COD_PROMOTORA"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "ICRED FINANCEIRA"
+            }
+        }
+    },
+    "config_safra": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Safra",
+
+        "mapeamento": {
+            "data_pagamento": "Data efetivacao",
+            "ade": "Contrato",
+            "convenio": "Nome Convenio",
+            "produto": "Produto",
+            "vlr_liquido": "Valor Base Comissao",
+            "vlr_bruto": "Valor Base Comissao",
+            "prazo": "Prazo",
+            "cod_tabela": "Cod Tabela Juros",
+            "tabela": "Nome Tabela Juros",
+            "data_digitacao": "Data Digitacao Contrato",
+            "cod_corretor": "Cod Corban",
+            "cod_master": "Cod Corban",
+            "usuario": "Login"
+        },
+
+        "fixos": {
+            "banco": "BANCO SAFRA"
+        },
+
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["Cod Corban"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "BANCO SAFRA"
+            }
+        }
+    },
+    "config_capital": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Capital",
+
+        "mapeamento": {
+            "data_pagamento": "Data Base",
+            "ade": "Proposta",
+            "convenio": "Descr. Empregador",
+            "vlr_liquido": "Valor liberacao",
+            "vlr_bruto": "Valor liberacao",
+            "prazo": "Qtd Parcelas",
+            "data_digitacao": "Data Cadastro",
+            "cod_corretor": "Codigo Promotora",
+            "cod_master": "Codigo Promotora"
+        },
+
+        "fixos": {
+            "banco": "CAPITAL CONSIG SCD S.A.",
+            "produto": null,
+            "cod_tabela": null,
+            "tabela": null,
+            "usuario": null
+        },
+
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["Codigo Promotora"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "CAPITAL CONSIG SCD S.A."
+            }
+        }
+    },
+    "config_digio": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Digio",
+
+        "mapeamento": {
+            "data_pagamento": "DT.BASE",
+            "ade": "NR.PROP. ",
+            "convenio": "DESCRIÇÃO EMPREGADOR",
+            "vlr_liquido": "VLR.CLI",
+            "vlr_bruto": "VLR.OPER",
+            "prazo": "PRC",
+            "tabela": "REGRA",
+            "data_digitacao": "DT.CAD.",
+            "cod_corretor": "CÓDIGO OPERADOR",
+            "cod_master": "CÓDIGO PROMOTORA",
+            "usuario": "DESCRIÇÃO  OPERADOR"
+        },
+
+        "fixos": {
+            "produto": null,
+            "banco": "BANCO DIGIO S.A."
+        },
+
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["CÓDIGO OPERADOR"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "BANCO DIGIO S.A."
+            },
+                "cod_corretor": {
+                "tipo": "extrair_antes",
+                "coluna_origem":"REGRA",
+                "delimitador": "-"
+                }
+        }
+    },
+    "config_lotus": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Lotus",
+
+        "mapeamento": {
+            "data_pagamento": "Data Pagamento",
+            "ade": "Código",
+            "convenio": "Produto",
+            "vlr_liquido": "Valor Desembolso (R$)",
+            "vlr_bruto": "Valor Desembolso (R$)",
+            "data_digitacao": "Data Contrato",
+            "cod_corretor": "ID Corban",
+            "cod_master": "ID Corban",
+            "usuario": "ID Corban"
+        },
+
+        "fixos": {
+            "banco": "LOTUS",
+            "produto": null,
+            "prazo": null,
+            "cod_tabela": null,
+            "tabela": null
+        },
+
+        "regras": {
+            "cod_indicado": {
+                "colunas_busca": ["ID Corban"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "LOTUS"
+            }
+        }
+    },
+    "config_Presenca": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Presenca Bank",
+
+        "mapeamento": {
+            "data_pagamento": "Data Pagamento",
+            "ade": "Id",
+            "convenio": "Produto",
+            "vlr_liquido": "Valor Líquido",
+            "vlr_bruto": "Valor Bruto",
+            "data_digitacao": "Data Venda",
+            "tabela": "Tabela",
+            "usuario": "Login digitador"
+        },
+
+        "fixos": {
+            "banco": "PRESENCA BANK",
+            "produto": null,
+            "prazo": null
+        },
+
+        "regras": {
+            "cod_corretor": {
+                "tipo": "extrair_antes",
+                "coluna_origem":"Parceiro",
+                "delimitador": "-"
+                },
+            "cod_master": {
+                "tipo": "extrair_antes",
+                "coluna_origem":"Parceiro",
+                "delimitador": "-"
+                },
+            "cod_tabela":{
+                "tipo": "extrair_antes",
+                "coluna_origem":"Tabela",
+                "delimitador": "-"
+                },
+            "cod_indicado": {
+                "colunas_busca": ["Parceiro"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "PRESENCA BANK"
+            }
+        }
+    },
+    "config_bmg_BI": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\BMG - BI",
+
+        "mapeamento": {
+            "data_pagamento": "Data - Produção",
+            "ade": "Adesão",
+            "convenio": "Tipo Convenio",
+            "produto": "Produto",
+            "vlr_liquido": "Vlr Produção",
+            "vlr_bruto": "Vlr Proposta",
+            "prazo":"Qtd. Total Parcela",
+            "data_digitacao": "Data - Adesão",
+            "tabela": "Produto",
+            "cod_corretor": "Loja Código",
+            "cod_master": "Matriz Código",  
+            "usuario": "Usuário" 
+        },
+
+        "fixos": {
+            "banco": "BANCO BMG"
+        },
+
+        "regras": {
+            "cod_tabela":{
+                "tipo": "extrair_antes",
+                "coluna_origem":"Produto",
+                "delimitador": "-"
+                },
+            "cod_indicado": {
+                "colunas_busca": ["Parceiro"],
+                "arquivo_referencia": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\cod indicados.xlsx",
+                "coluna_codigo": "Cod Loja",
+                "coluna_retorno": "Usuario",
+
+                "coluna_banco": "Banco",
+                "valor_banco": "BANCO BMG"
+            }
+        }
+    },
+    "config_happy":{
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Happy",
+
+        "mapeamento": {
+            "data_pagamento": "Data Integração",
+            "ade": "Nr Proposta",
+            "convenio": "Convenio",
+            "produto": "Produto",
+            "vlr_liquido": "Valor Liberado Cliente",
+            "vlr_bruto": "Valor Proposta",
+            "prazo":"Qtd Parcelas",
+            "data_digitacao": "Data Cadastro",  
+            "usuario": "Identificador do Usuário" 
+        },
+        "fixos": {
+            "banco": "BANCO HAPPY CONSIG",
+            "tabela": null,
+            "cod_tabela": null,
+            "cod_corretor": null,
+            "cod_master": null,
+            "cod_indicado": null
+        }
+    },
+    "config_pan": {
+        "pasta": "G:\\Drives compartilhados\\FINANCEIRO\\01 TESOURARIA\\03.PRODUÇÃO\\Arquivos_Banco\\Pan",
+
+        "mapeamento": {
+            "data_pagamento": "Data do Lançamento",
+            "ade": "Nº Proposta",
+            "vlr_liquido": "Valor Financiado",
+            "vlr_bruto": "VLR_LIB1",
+            "prazo": "LIB1",
+            "data_digitacao": "Data do Cadastro", 
+            "cod_master": "Código da Promotora",
+            "convenio": "Nome do Empregador",
+            "produto": "Tipo de Operação",
+            "usuario": "USUARIO INCLUSAO",
+            "tabela": "Nome do Convênio",
+            "cod_tabela": "Código do Convênio"
+        },
+        "fixos": {
+           "cod_corretor": null,
+            "cod_indicado": null, 
+            "banco": "BANCO PAN"
+        }
+    }
+}
