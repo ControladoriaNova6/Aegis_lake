@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "db-tesouraria",
+  "private_key_id": "8e378031f0698fa1baee4d147b9faab36697f00f",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDnw8tepqbBgASK\n1RkpSyMpOd3lJ4QR/lF9IVzO1yQjn3khkPKnLqAGLcbb9HPEDJb4awMIV6ztnQEk\nfekWIRVuJ+BEGtmSq3HK5a4Z+//qUYEOGbvpdniTIoAlxDryk75QoVR97PyDsRfi\nLwZijsU/dPDuWRts8B6I5FKEiD8PmWs0CaEKhU3goDjFtL9hCEe3qPVh8g0OmloF\nZ9U+seSCOsep2CWsDn0y4XCTq7r6CLAQ5BcPcKxYziN8fTpqcUTYkP638P6GWDsK\nAAP/cQEwUPpF0oosYAtA2xkC2NF/ZOvTKIqzjtnYNBH230yRYrIFD4L+u6VthcKC\nMcoed3DHAgMBAAECggEANQZUtxkFueuiHmlW0l3Ac6QrokwCKWO4HRrO8vvB5uyL\neCSDf8BpGEDM6HHrMoV23OsOzI/SnqJ3KnQsKcXz8znoU2yZLrdO147o4EUJbgCr\nuCAnH+jc+TzBeOKGYg1vU181x4G63B5eSn9bxJzJgBUvMjjsz2W4drVWM8BAPT77\nCB4DWwUgQhBiFKfusby5kg5wZVJ9I2UhjGbvSwXpLZR6A/C3F8q/2VwD8nGzR35D\nz80dvxmow9Iw9NoqST0u+5nLuuJza/5uZVpSvEVVwlrMnDONlAaLIlK+xPcBUIsG\nyK/sjm4KksGVHpMJjFETElPD1dkIOMjfmJEiSjYigQKBgQD67BCOYSfo6poi/Soz\nBT0yCoEmOHEiVmf+XakNNQA9QJYiqBHyj/YnTuwk7hPDgITwzjdBM3tmdgiz7iGQ\n1/R8yKjgagSU+bQlm0hlIdReLdMXPsfqXOAYIfqVhX2RmuwpdSPQaNRnsvX6x+NC\nYMpZCIZmdiCySErc7VrZUK//pwKBgQDsdHuXecoy8xOAnI9FixjH6QyWG0iIRpXH\nKG/fdqLuvBmjmYuNNworrtPpXSyCxiX1CnQOgWBTfDYkRz6vsdfqgMiLOL/PpCu1\ne65MA9I2fvKv7TB/PdOfyYL3Y7dFXRtybx0wmu3sI5nPvs8Zq2CHGFniJhxMIrf4\ngiYUKDop4QKBgHWiHdDh81faRBCLJzFsD1haXFmStFcosvAo8IvkgQw2LyxoJqHU\no82hzksx4coRgkFyK61BeWR7iXDw/oNs+o1VdPZgPW2p8q5+sd3Xkjvkt8V6BTb1\n+4jUxSk7v7Z3Lqfw5q1Zt9o1p+O9uejwf2xl9rwqPQHXqmEQVTrz/M6ZAoGBAIdX\nhQaG532SNK+A7WDY5S5H7rRcmX+nJ0P/mUlHFqufbu19jaseveuS/iis9DVGRaOk\ngBltZD1k83iAbxkRqozHegJ2URQA3CPczz8jUMdwkmiwUvoB4YesSBJiORyy1msB\nvqt7goOPPRL0HIaM2Yt6HLidJ8VMehD8Ld+Lxv8BAoGAG6SzFxEq/JoTu2L0QF3l\nFYxn5QLXFZrjKaCtJfrlE3KrO4m1pQxhkD9wLI2kNAwXOthEFMbMWPAVoZJBQOht\new86rmdNryJbHcOpOdFT6YdUZM5wHEUCjimZqzmRuE+W6f27ycaMTKZfoNq5piNM\ngbevtPOBSPrO96rZg4Aj0VM=\n-----END PRIVATE KEY-----\n",
+  "client_email": "chave-tesouraria@db-tesouraria.iam.gserviceaccount.com",
+  "client_id": "112389434553201947929",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/chave-tesouraria%40db-tesouraria.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
