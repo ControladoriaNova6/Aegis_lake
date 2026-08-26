@@ -1,0 +1,3 @@
+Coloque aqui o arquivo grupo_nova_icon.png (o logo que você quer usar como
+ícone da aba do navegador e na sidebar). O código já está configurado pra
+procurar exatamente esse nome de arquivo nesta pasta.
