@@ -156,6 +156,18 @@ acessa no navegador**, não o :8000.
   houver), zera quando o critério estiver marcado "Não contabilizar"
   (nova opção de status em Critérios), ou mantém o valor normal quando
   nenhum critério bate com aquela linha
+- **Marca visual (logo)**: ícone maior na sidebar/login (52px/72px, era
+  36px — herdado do tamanho antigo do monograma), letra "e" de "Aegis"
+  destacada na cor de acento
+- **Correção de performance (N+1 consultas)** — a Visão geral de
+  Campanhas fazia uma consulta nova ao BigQuery pra CADA campanha, em
+  sequência, sem cache nenhum (com 10 campanhas = 10 idas e voltas ao
+  banco antes da página responder). Idem pros filtros de produção do
+  Cadastro de Campanha (3 consultas a cada carregamento). Ambos agora têm
+  cache — testei com 5 campanhas: a 2ª chamada não fez nenhuma consulta
+  nova e ficou mais de 100x mais rápida. Também corrigi uma lacuna
+  relacionada: rodar o cruzamento de dados em Manutenção não invalidava
+  o cache — agora invalida corretamente
 - Filtros de produção no cadastro de campanha viraram lista suspensa com
   seleção múltipla (`MultiSelectDropdown`) em vez do `<select multiple>`
   nativo do navegador; rótulos simplificados pra Indicado/Convênio/Produto
