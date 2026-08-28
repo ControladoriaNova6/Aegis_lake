@@ -9,7 +9,7 @@ services:
     buildCommand: >
       cd frontend && npm install && npm run build &&
       cd ../backend && pip install -r requirements.txt
-    startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT app:app
+    startCommand: cd backend && gunicorn -b 0.0.0.0:$PORT --timeout 300 --workers 1 --worker-class gthread --threads 4 app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

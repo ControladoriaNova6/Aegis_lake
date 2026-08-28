@@ -126,9 +126,14 @@ acessa no navegador**, não o :8000.
   toda a produção do banco no período. A rota que alimenta essas opções
   (`/api/manutencao/valores-mapeados`) já está pronta — Convênio/Produto
   ainda vêm vazios até esses cruzamentos existirem
-- **Detalhamento por indicado** — nova seção na tela de Indicados: Banco |
-  Indicado | Convênio | Produto | Produção, com filtro de banco/período
-  (só busca ao clicar "Atualizar agora")
+- **Detalhamento por indicado** — "planilha dinâmica" na tela de
+  Indicados: acordeão de 4 níveis (Banco → Indicado → Convênio → Produto),
+  cada nível com subtotal, expansível/recolhível. Usa `map_convenio`/
+  `map_produto` (colunas de tratamento) em vez das colunas brutas, e só
+  mostra produção de **indicados já cadastrados** — código sem cadastro
+  correspondente fica de fora, mesmo que já tenha passado pelo
+  cruzamento em Manutenção. Filtro de banco/período (só busca ao clicar
+  "Atualizar agora") + botão de download em `.xlsx` com os mesmos dados
 - **Projeto renomeado para Aegis**
 - Filtros de produção no cadastro de campanha viraram lista suspensa com
   seleção múltipla (`MultiSelectDropdown`) em vez do `<select multiple>`
@@ -163,6 +168,21 @@ acessa no navegador**, não o :8000.
   - Botão "Adicionar aos valores em aberto" direto na listagem de
     Cadastro de Campanha (manual, pré-preenche banco/categoria/período a
     partir da campanha)
+- **Login com primeiro acesso** — o admin agora cadastra só e-mail/nome/
+  papel (senha vira opcional); a pessoa acessa a tela de login → "Primeiro
+  acesso", informa o e-mail cadastrado e cria a própria senha. Tabela de
+  usuários mostra o status ("Ativo" / "Aguardando primeiro acesso"). Nota
+  de segurança: como não há e-mail de verificação, o fluxo confia que só
+  a própria pessoa conhece o e-mail dela — razoável pra uma ferramenta
+  interna onde só o admin cria contas, mas vale lembrar dessa limitação
+- **Atingimento de meta de campanha** — a Visão geral de Campanhas agora
+  liga cada campanha à produção real da base consolidada (respeitando
+  líquido/bruto e os filtros de Map Indicado/Convênio/Produto). Mostra
+  produção acumulada, % de atingimento, meta prevista, valor previsto,
+  próxima meta/faixa — ou "Teto da campanha atingido" quando não há mais
+  faixa a perseguir. Filtros de banco/período/campanha entre os cards e a
+  tabela (só aplicam ao clicar "Atualizar agora")
+- Logo própria (ícone de escudo) — favicon, sidebar e tela de login
 - Indicados — CRUD da base usada como lookup na importação (Editor/Admin)
 - Campanhas:
   - **Cadastro**: sem vigência, com faixas/metas dinâmicas (botão "+
@@ -237,6 +257,32 @@ momento específico, o cache do servidor e a thread de aquecimento
 começam vazios de novo (a mesma lentidão inicial que a arquitetura
 resolve para o resto da sessão). Pra teste, isso é normal e esperado; num
 uso contínuo de verdade, o plano pago mantém o serviço sempre ligado.
+
+### Importação de arquivos grandes
+
+O `gunicorn` (servidor de produção) mata qualquer requisição que passe do
+tempo limite configurado — o padrão dele é **30 segundos**, e importar um
+arquivo grande (ler o Excel, processar, gravar no BigQuery) facilmente
+passa disso. Quando isso acontece, o navegador só vê uma falha genérica,
+sem mensagem clara do motivo.
+
+O `render.yaml` já vem configurado com um limite bem mais folgado
+(`--timeout 300`, ou seja, 5 minutos) — confirmei isso rodando o mesmo
+cenário localmente: com o timeout padrão a requisição falha exatamente no
+segundo 2 (usei um teste artificial mais curto pra não esperar 30s de
+verdade); com o timeout de 300s, a mesma requisição lenta completa
+normalmente.
+
+Se mesmo assim um arquivo específico continuar falhando, dois pontos a
+considerar:
+- **Excel é lento de ler** — a biblioteca que lemos `.xlsx` (`openpyxl`)
+  é bem mais lenta que ler `.csv` pra arquivos grandes. Se a fonte do
+  arquivo permitir exportar como `.csv`, tende a importar bem mais rápido.
+- **RAM do plano gratuito** — o Render free tem só 512 MB de memória. Um
+  arquivo realmente enorme pode estourar isso independente do tempo. Se
+  isso acontecer, o sintoma é parecido (a importação simplesmente morre no
+  meio), mas a solução é diferente: precisaria de um plano com mais
+  memória, não só mais tempo.
 
 ### Rodando local sem Render
 
