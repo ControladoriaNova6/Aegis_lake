@@ -66,7 +66,7 @@ export default function Sidebar() {
       <div className="brand">
         <img src="/aegis-logo.png" className="brand-mark-img" alt="Aegis" />
         <div className="brand-name">
-          Aegis
+          A<span className="brand-name-accent">e</span>gis
         </div>
       </div>
 

@@ -160,9 +160,9 @@ export default function Login() {
       }}
     >
       <div className="card" style={{ width: 340 }}>
-        <img src="/aegis-logo.png" alt="Aegis" style={{ width: 52, height: "auto", display: "block", margin: "0 auto 1rem" }} />
-        <p className="section-title" style={{ margin: "0 0 0.25rem", textAlign: "center" }}>
-          Aegis
+        <img src="/aegis-logo.png" alt="Aegis" style={{ width: 72, height: "auto", display: "block", margin: "0 auto 1rem" }} />
+        <p className="section-title" style={{ margin: "0 0 0.25rem", textAlign: "center", fontSize: "1.3rem" }}>
+          A<span className="brand-name-accent">e</span>gis
         </p>
 
         {modo === "login" ? (
