@@ -8,6 +8,7 @@ from google.cloud import bigquery
 from lib.bigquery_client import get_bigquery_client, erro_e_de_billing
 from lib.indicados import carregar_todos_indicados
 from lib.importador import PROJECT, DATASET, TABELA_PRINCIPAL
+from lib.cache import cached, invalidar_tudo
 
 # Colunas de tratamento que a função de cruzar dados popula. Nenhuma
 # delas nunca vem de arquivo importado — são sempre calculadas aqui.
@@ -54,13 +55,17 @@ def _codigos_indicados_validos():
     return sorted(codigos)
 
 
+@cached()
 def listar_valores_mapeados():
     """Valores distintos já existentes nas colunas de tratamento
     (map_indicado, map_convenio, map_produto) da base consolidada — usado
     pra popular os filtros opcionais de produção no cadastro de campanha.
     Enquanto essas colunas não tiverem dado (ou não existirem ainda),
     devolve listas vazias — não quebra nada, só significa que ainda não
-    tem opção pra filtrar por ali."""
+    tem opção pra filtrar por ali.
+
+    Tem cache: sem isso, essa função faz 3 consultas ao BigQuery (uma por
+    coluna) toda vez que a tela de Cadastro de Campanha é carregada."""
     garantir_colunas_map()
     client = get_bigquery_client()
     tabela = f"`{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}`"
@@ -144,5 +149,11 @@ def executar_cruzamento_indicado():
             query_parameters=[bigquery.ArrayQueryParameter("codigos", "STRING", codigos)]
         )
         client.query(rebuild_query, job_config=job_config2).result()
+
+    # o cruzamento muda dado que várias telas em cache dependem (filtro
+    # de campanha, detalhamento por indicado) — sem isso, ficariam
+    # mostrando o estado de antes do cruzamento até algo mais disparar
+    # invalidar_tudo() por outro motivo.
+    invalidar_tudo()
 
     return {"linhas_atualizadas": linhas_atualizadas, "codigos_considerados": len(codigos)}

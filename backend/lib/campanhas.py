@@ -390,11 +390,21 @@ def excluir_criterio(id_, excluido_por=None):
 # ─────────────────────────────────────────────────────────────────────────
 # Atingimento de meta (liga a campanha à produção real da base consolidada)
 # ─────────────────────────────────────────────────────────────────────────
+@cached()
 def _producao_campanha(campanha, data_inicio, data_fim):
     """Soma a produção (líquido ou bruto, conforme campanha['base_producao'])
     do banco da campanha, no intervalo de datas dado, respeitando os
     filtros opcionais de map_indicado/map_convenio/map_produto quando a
-    campanha tiver algum definido."""
+    campanha tiver algum definido.
+
+    Tem cache: sem isso, toda vez que a Visão geral de Campanhas é
+    carregada, o backend fazia UMA CONSULTA NOVA AO BIGQUERY PRA CADA
+    CAMPANHA, em sequência (se você tem 10 campanhas, são 10 idas e
+    voltas ao banco antes da página responder) — essa é a causa mais
+    provável de qualquer lentidão sentida nessa tela. Com @cached(), a
+    mesma campanha + mesmo período só consulta de verdade uma vez; depois
+    fica instantâneo até algo mudar (nova importação, edição de campanha)
+    ou a pessoa clicar em "Atualizar agora"."""
     from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
     from lib.manutencao import garantir_colunas_map
 
