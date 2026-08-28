@@ -135,6 +135,27 @@ acessa no navegador**, não o :8000.
   cruzamento em Manutenção. Filtro de banco/período (só busca ao clicar
   "Atualizar agora") + botão de download em `.xlsx` com os mesmos dados
 - **Projeto renomeado para Aegis**
+- **Nova identidade visual** — logo em escudo com gráfico/circuito (fornecida
+  por você, recortada e com fundo transparente), cor de destaque trocada
+  de roxo para índigo (aplicada centralizadamente via `theme.css`, sem
+  nenhuma cor hardcoded no resto do app)
+- Gráfico de produção diária: data no eixo em formato dd/mm, e nenhum
+  elemento do Plotly (incluindo o tooltip de hover) mais usa cor padrão
+  da biblioteca
+- Textos explicativos repetitivos removidos (Dashboard, Campanhas Visão
+  Geral, Indicados); campos obrigatórios agora têm uma dica sutil "Obrigatório"
+  logo abaixo do campo, em vez de um parágrafo à parte
+- Campanhas — Visão geral: colunas "Map Convênio" e "Map Produto" na
+  tabela, mostrando os filtros de produção configurados em cada campanha
+- Detalhamento por indicado: filtro de texto pra localizar um código de
+  indicado específico (aplica na hora, sem precisar de "Atualizar agora")
+- **Relatório de apuração por proposta** — botão de download no Cadastro
+  de Campanha: gera um `.xlsx` com toda a produção do banco no período da
+  campanha, linha por linha, com uma coluna "Valor apuração" calculada
+  automaticamente — aplica o % especial do critério correspondente (se
+  houver), zera quando o critério estiver marcado "Não contabilizar"
+  (nova opção de status em Critérios), ou mantém o valor normal quando
+  nenhum critério bate com aquela linha
 - Filtros de produção no cadastro de campanha viraram lista suspensa com
   seleção múltipla (`MultiSelectDropdown`) em vez do `<select multiple>`
   nativo do navegador; rótulos simplificados pra Indicado/Convênio/Produto
