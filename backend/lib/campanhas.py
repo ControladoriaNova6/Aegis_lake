@@ -503,3 +503,92 @@ def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None
         })
 
     return resultado
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Relatório de apuração por proposta (download em Excel, no Cadastro de
+# campanha)
+# ─────────────────────────────────────────────────────────────────────────
+STATUS_CRITERIO_NAO_CONTABILIZAR = "nao_contabilizar"
+
+
+def _criterio_aplica(criterio, linha):
+    """Um critério "aplica" numa linha de produção se convênio e produto
+    baterem (quando o critério define esses campos) — e, se o critério
+    também tiver uma tabela definida, ela precisa bater com a tabela/
+    código de tabela da linha."""
+    if criterio.get("convenio"):
+        if (linha.get("convenio") or "").strip().upper() != (criterio["convenio"] or "").strip().upper():
+            return False
+    if criterio.get("produto"):
+        if (linha.get("produto") or "").strip().upper() != (criterio["produto"] or "").strip().upper():
+            return False
+    if criterio.get("tabela"):
+        tabela_linha = str(linha.get("cod_tabela") or linha.get("tabela") or "").strip()
+        if tabela_linha != str(criterio["tabela"]).strip():
+            return False
+    return True
+
+
+def gerar_relatorio_apuracao(campanha_id):
+    """Toda a produção do banco da campanha, no período da campanha —
+    com uma coluna a mais (valor_apuracao) calculada linha a linha:
+      - se algum critério da campanha bater com a linha e estiver
+        marcado "Não contabilizar" → valor_apuracao = 0
+      - se algum critério bater e tiver % especial definido →
+        valor_apuracao = valor da linha (líquido/bruto conforme a
+        campanha) * (perc_especial / 100)
+      - senão (nenhum critério bate, ou bate sem % especial) →
+        valor_apuracao = valor da linha, sem ajuste."""
+    from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
+
+    campanhas = listar_campanhas()
+    campanha = next((c for c in campanhas if c["id"] == campanha_id), None)
+    if not campanha:
+        raise ValueError("Campanha não encontrada.")
+
+    criterios_todos = listar_criterios()
+    criterios_da_campanha = [c for c in criterios_todos if c.get("campanha_id") == campanha_id]
+
+    coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
+
+    client = get_bigquery_client()
+    tabela = f"`{P_DASH}.{D_DASH}.{TABELA_PRINCIPAL}`"
+
+    colunas = [
+        "data_pagamento", "ade", "banco", "convenio", "produto", "cod_tabela", "tabela",
+        "vlr_liquido", "vlr_bruto", "usuario", "cod_corretor", "cod_master", "cod_indicado",
+    ]
+    query = f"""
+        SELECT {", ".join(colunas)}
+        FROM {tabela}
+        WHERE UPPER(banco) = @banco
+          AND {DATE_COLUMN} BETWEEN @data_inicio AND @data_fim
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("banco", "STRING", (campanha.get("banco") or "").upper()),
+            bigquery.ScalarQueryParameter("data_inicio", "DATE", campanha.get("data_inicio")),
+            bigquery.ScalarQueryParameter("data_fim", "DATE", campanha.get("data_fim")),
+        ]
+    )
+    linhas = client.query(query, job_config=job_config).result()
+
+    resultado = []
+    for linha in linhas:
+        linha_dict = dict(linha)
+        valor_base = float(linha_dict.get(coluna_valor) or 0)
+
+        criterio_encontrado = next((c for c in criterios_da_campanha if _criterio_aplica(c, linha_dict)), None)
+
+        if criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+            valor_apuracao = 0.0
+        elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
+            valor_apuracao = valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
+        else:
+            valor_apuracao = valor_base
+
+        linha_dict["valor_apuracao"] = round(valor_apuracao, 2)
+        resultado.append(linha_dict)
+
+    return campanha, resultado

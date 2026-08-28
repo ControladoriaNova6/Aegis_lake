@@ -1,4 +1,7 @@
-from flask import Blueprint, request, jsonify
+import io
+from datetime import datetime
+
+from flask import Blueprint, request, jsonify, send_file
 
 from routes_auth import login_required, requer_papel, usuario_atual
 from lib.campanhas import (
@@ -11,6 +14,7 @@ from lib.campanhas import (
     excluir_criterio,
     listar_auditoria_criterios,
     listar_campanhas_com_atingimento,
+    gerar_relatorio_apuracao,
     CAMPOS_CAMPANHA,
     CAMPOS_CRITERIO,
     CAMPOS_FILTRO_PRODUCAO,
@@ -50,6 +54,63 @@ def campanhas_atingimento():
         return jsonify({"erro": str(exc)}), 500
 
     return jsonify(linhas)
+
+
+@bp_campanhas.route("/campanhas/<id_campanha>/relatorio-apuracao/download")
+@login_required
+def campanhas_relatorio_apuracao_download(id_campanha):
+    """Toda a produção do banco no período da campanha, com a coluna
+    'Valor apuração' calculada linha a linha (aplica % especial dos
+    critérios, zera o que estiver marcado "Não contabilizar")."""
+    import pandas as pd
+
+    try:
+        campanha, linhas = gerar_relatorio_apuracao(id_campanha)
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 404
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500
+
+    colunas_ordem = [
+        "data_pagamento", "ade", "banco", "convenio", "produto", "cod_tabela", "tabela",
+        "vlr_liquido", "vlr_bruto", "usuario", "cod_corretor", "cod_master", "cod_indicado",
+        "valor_apuracao",
+    ]
+    df = pd.DataFrame(linhas)
+    for col in colunas_ordem:
+        if col not in df.columns:
+            df[col] = None
+    df = df[colunas_ordem].rename(columns={
+        "data_pagamento": "Data pagamento", "ade": "ADE (proposta)", "banco": "Banco",
+        "convenio": "Convênio", "produto": "Produto", "cod_tabela": "Cód. tabela", "tabela": "Tabela",
+        "vlr_liquido": "Valor líquido", "vlr_bruto": "Valor bruto", "usuario": "Usuário",
+        "cod_corretor": "Cód. corretor", "cod_master": "Cód. master", "cod_indicado": "Cód. indicado",
+        "valor_apuracao": "Valor apuração",
+    })
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Apuração")
+        workbook = writer.book
+        worksheet = writer.sheets["Apuração"]
+        formato_moeda = workbook.add_format({"num_format": "R$ #,##0.00"})
+        formato_data = workbook.add_format({"num_format": "dd/mm/yyyy"})
+        worksheet.set_column("A:A", 14, formato_data)
+        worksheet.set_column("B:G", 16)
+        worksheet.set_column("H:I", 16, formato_moeda)
+        worksheet.set_column("J:M", 14)
+        worksheet.set_column("N:N", 16, formato_moeda)
+
+    buffer.seek(0)
+    nome_campanha = "".join(c if c.isalnum() else "_" for c in (campanha.get("campanha") or "campanha"))
+    nome_arquivo = f"apuracao_{nome_campanha}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=nome_arquivo,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @bp_campanhas.route("/campanhas", methods=["POST"])
