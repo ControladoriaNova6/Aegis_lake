@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
-import { Users, Plus, Trash, Refresh } from "../components/icons";
+import { Users, Plus, Trash, Refresh, Download } from "../components/icons";
 import { brl, mesBr, mesAtual } from "../utils/format";
 
 async function buscarIndicados(busca) {
@@ -64,6 +64,30 @@ export default function Indicados() {
   function handleAtualizarDetalhamento() {
     setDetalhamentoAplicado({ banco: filtroDetBanco, mesInicio: filtroDetMesInicio, mesFim: filtroDetMesFim });
     queryClient.invalidateQueries({ queryKey: ["indicados-detalhamento"] });
+  }
+
+  const [baixando, setBaixando] = useState(false);
+
+  async function handleBaixarDetalhamento() {
+    setBaixando(true);
+    try {
+      const params = { mes_inicio: detalhamentoAplicado.mesInicio, mes_fim: detalhamentoAplicado.mesFim };
+      if (detalhamentoAplicado.banco) params.banco = detalhamentoAplicado.banco;
+      const response = await api.get("/indicados/detalhamento/download", { params, responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const dataStr = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      link.setAttribute("download", `detalhamento_indicados_${dataStr}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setMensagem({ ok: false, texto: "Não foi possível gerar a planilha." });
+    } finally {
+      setBaixando(false);
+    }
   }
 
   const adicionarMutation = useMutation({
@@ -191,7 +215,7 @@ export default function Indicados() {
       <PageHeader
         icon={<Users />}
         title="Detalhamento por indicado"
-        subtitle="Produção agrupada por Banco, Indicado (Map Indicado), Convênio e Produto."
+        subtitle="Produção agrupada por Banco, Indicado, Convênio (Map Convênio) e Produto (Map Produto) — só de indicados cadastrados."
       />
 
       <div className="card card-fit">
@@ -217,16 +241,21 @@ export default function Indicados() {
           </div>
           <div className="form-row form-row-action">
             <label>&nbsp;</label>
-            <button type="button" onClick={handleAtualizarDetalhamento}>
-              <Refresh /> Atualizar agora
-            </button>
+            <div className="filter-actions">
+              <button type="button" onClick={handleAtualizarDetalhamento}>
+                <Refresh /> Atualizar agora
+              </button>
+              <button type="button" className="btn-link" onClick={handleBaixarDetalhamento} disabled={baixando}>
+                <Download /> {baixando ? "Gerando…" : "Baixar planilha"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <p className="muted small" style={{ margin: "0.75rem 0 1.5rem" }}>
-        Mudar o filtro só é aplicado ao clicar em "Atualizar agora". "Indicado" ainda aparece como "(sem indicado)"
-        pra produção que não passou pelo cruzamento de dados em Manutenção.
+        Mudar o filtro só é aplicado ao clicar em "Atualizar agora". Só entra aqui produção de indicados já
+        cadastrados — quem ainda não passou pelo cruzamento de dados em Manutenção não aparece.
       </p>
 
       {carregandoDetalhamento && <div className="skeleton-block" />}
@@ -238,26 +267,62 @@ export default function Indicados() {
       )}
 
       {detalhamento && !erroDetalhamento && (
-        <div className="card table-wrap">
-          <table>
-            <thead>
-              <tr><th>Banco</th><th>Indicado</th><th>Convênio</th><th>Produto</th><th className="align-right">Produção</th></tr>
-            </thead>
-            <tbody>
-              {detalhamento.linhas.length === 0 && (
-                <tr><td colSpan={5} className="muted center">Nenhum dado para os filtros selecionados.</td></tr>
-              )}
-              {detalhamento.linhas.map((l, idx) => (
-                <tr key={idx}>
-                  <td className="small">{l.banco}</td>
-                  <td className="small">{l.indicado}</td>
-                  <td className="small">{l.convenio}</td>
-                  <td className="small">{l.produto}</td>
-                  <td className="mono small align-right">{brl(l.producao)}</td>
-                </tr>
+        <div className="card">
+          <p className="section-label">Banco → Indicado → Convênio → Produto</p>
+          {detalhamento.bancos.length === 0 ? (
+            <p className="muted center" style={{ padding: "1.5rem 0" }}>
+              Nenhuma produção de indicado cadastrado para os filtros selecionados.
+            </p>
+          ) : (
+            <div className="accordion">
+              {detalhamento.bancos.map((bancoItem) => (
+                <details key={bancoItem.nome} className="accordion-item level-banco">
+                  <summary>
+                    <span>{bancoItem.nome}</span>
+                    <span className="mono">{brl(bancoItem.total)}</span>
+                  </summary>
+                  <div className="accordion-body">
+                    {bancoItem.indicados.map((indicadoItem) => (
+                      <details key={indicadoItem.codigo} className="accordion-item level-indicado">
+                        <summary>
+                          <span>{indicadoItem.nome}</span>
+                          <span className="mono">{brl(indicadoItem.total)}</span>
+                        </summary>
+                        <div className="accordion-body">
+                          {indicadoItem.convenios.map((conv) => (
+                            <details key={conv.nome} className="accordion-item level-convenio">
+                              <summary>
+                                <span>{conv.nome}</span>
+                                <span className="mono">{brl(conv.total)}</span>
+                              </summary>
+                              <div className="accordion-body">
+                                <table>
+                                  <thead>
+                                    <tr>
+                                      <th>Produto</th>
+                                      <th className="align-right">Produção</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {conv.produtos.map((p, idx) => (
+                                      <tr key={idx}>
+                                        <td>{p.nome}</td>
+                                        <td className="mono align-right">{brl(p.total)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </details>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,0 +1,33 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="aegisGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a78bfa" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <path
+    d="M24 3 L41 9 V22 C41 32.5 34 40.5 24 45 C14 40.5 7 32.5 7 22 V9 Z"
+    fill="url(#aegisGrad)"
+  />
+  <path
+    d="M24 3 L41 9 V22 C41 32.5 34 40.5 24 45 C14 40.5 7 32.5 7 22 V9 Z"
+    fill="none"
+    stroke="rgba(255,255,255,0.15)"
+    stroke-width="1"
+  />
+  <path
+    d="M24 13 L33 17.5 V23.5 C33 30 29 35 24 37.5 C19 35 15 30 15 23.5 V17.5 Z"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2.2"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M19.5 24 L22.5 27 L29 20"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

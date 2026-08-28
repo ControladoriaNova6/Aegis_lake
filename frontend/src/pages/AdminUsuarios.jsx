@@ -62,10 +62,6 @@ export default function AdminUsuarios() {
       setMensagem({ ok: false, texto: "Informe um e-mail válido." });
       return;
     }
-    if (!editandoEmail && !senha) {
-      setMensagem({ ok: false, texto: "Defina uma senha para o novo usuário." });
-      return;
-    }
     salvarMutation.mutate({ email, nome, senha: senha || undefined, papel });
   }
 
@@ -127,13 +123,13 @@ export default function AdminUsuarios() {
             />
           </div>
           <div className="form-row">
-            <label>Senha</label>
+            <label>Senha (opcional)</label>
             <input
               type="password"
               name="novo-usuario-senha"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              placeholder={editandoEmail ? "deixe em branco para manter a atual" : "obrigatória para usuário novo"}
+              placeholder={editandoEmail ? "deixe em branco para manter a atual" : "deixe em branco — a pessoa define no primeiro acesso"}
               autoComplete="new-password"
             />
           </div>
@@ -162,8 +158,10 @@ export default function AdminUsuarios() {
       </form>
 
       <p className="muted small" style={{ margin: "0 0 1.5rem" }}>
-        Clique no ícone de editar numa linha da tabela pra carregar os dados dela aqui em cima. O e-mail não pode ser
-        trocado numa edição — pra isso, exclua e cadastre de novo.
+        Ao cadastrar um usuário novo sem senha, a pessoa acessa a tela de login e usa "Primeiro acesso" com o
+        e-mail cadastrado aqui pra criar a própria senha. Clique no ícone de editar numa linha da tabela pra
+        carregar os dados dela aqui em cima (o e-mail não pode ser trocado numa edição — pra isso, exclua e
+        cadastre de novo).
       </p>
 
       {isLoading && <div className="skeleton-block" />}
@@ -178,11 +176,11 @@ export default function AdminUsuarios() {
         <div className="card table-wrap">
           <table>
             <thead>
-              <tr><th>E-mail</th><th>Nome</th><th>Papel</th><th></th></tr>
+              <tr><th>E-mail</th><th>Nome</th><th>Papel</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {usuarios.length === 0 && (
-                <tr><td colSpan={4} className="muted center">Nenhum usuário cadastrado ainda.</td></tr>
+                <tr><td colSpan={5} className="muted center">Nenhum usuário cadastrado ainda.</td></tr>
               )}
               {usuarios.map((u) => {
                 const podeExcluir = u.email !== usuarioLogado?.email;
@@ -191,6 +189,10 @@ export default function AdminUsuarios() {
                     <td className="small">{u.email}</td>
                     <td className="small">{u.nome}</td>
                     <td className="small">{PAPEL_LABEL[u.papel] || u.papel}</td>
+                    <td className="small">
+                      <span className={`status-dot ${u.tem_senha ? "ok" : "warn"}`} />
+                      {u.tem_senha ? "Ativo" : "Aguardando primeiro acesso"}
+                    </td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <button
                         className="btn-link"

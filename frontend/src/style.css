@@ -103,6 +103,12 @@ body {
   background: transparent;
 }
 
+.accordion-item.level-indicado > summary {
+  color: var(--ink);
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.015);
+}
+
 .accordion-body {
   padding: 0.5rem 0.9rem 0.75rem 1.75rem;
   display: flex;

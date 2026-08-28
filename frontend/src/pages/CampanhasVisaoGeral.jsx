@@ -1,35 +1,128 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
-import { Megaphone } from "../components/icons";
-import { brl } from "../utils/format";
+import { Megaphone, Refresh } from "../components/icons";
+import { brl, mesBr, mesAtual } from "../utils/format";
 
-async function buscarCampanhas() {
-  const { data } = await api.get("/campanhas");
+async function buscarBancos() {
+  const { data } = await api.get("/bancos");
   return data;
 }
 
-async function buscarCriterios() {
-  const { data } = await api.get("/criterios");
+async function buscarMeses() {
+  const { data } = await api.get("/relatorio/meses");
   return data;
+}
+
+function mesParaDataInicio(mes) {
+  return mes ? `${mes}-01` : null;
+}
+
+function mesParaDataFim(mes) {
+  if (!mes) return null;
+  const [ano, m] = mes.split("-").map(Number);
+  const ultimoDia = new Date(ano, m, 0).getDate();
+  return `${mes}-${String(ultimoDia).padStart(2, "0")}`;
+}
+
+async function buscarAtingimento({ banco, mesInicio, mesFim, campanha }) {
+  const params = {};
+  if (banco) params.banco = banco;
+  if (mesInicio) params.data_inicio = mesParaDataInicio(mesInicio);
+  if (mesFim) params.data_fim = mesParaDataFim(mesFim);
+  if (campanha) params.campanha = campanha;
+  const { data } = await api.get("/campanhas/atingimento", { params });
+  return data;
+}
+
+function StatusChip({ status }) {
+  return (
+    <>
+      <span className={`status-dot ${status === "Vigente" ? "ok" : status === "Finalizada" ? "" : "warn"}`} />
+      {status || "Vigente"}
+    </>
+  );
 }
 
 export default function CampanhasVisaoGeral() {
-  const { data: campanhas = [], isLoading, isError, error } = useQuery({
-    queryKey: ["campanhas"],
-    queryFn: buscarCampanhas,
-  });
-  const { data: criterios = [] } = useQuery({ queryKey: ["criterios"], queryFn: buscarCriterios });
+  const queryClient = useQueryClient();
+  const atual = mesAtual();
 
+  const [banco, setBanco] = useState("");
+  const [mesInicio, setMesInicio] = useState(atual);
+  const [mesFim, setMesFim] = useState(atual);
+  const [campanha, setCampanha] = useState("");
+  const [filtrosAplicados, setFiltrosAplicados] = useState({ banco: "", mesInicio: atual, mesFim: atual, campanha: "" });
+
+  const { data: bancos = [] } = useQuery({ queryKey: ["bancos"], queryFn: buscarBancos });
+  const { data: meses = [] } = useQuery({ queryKey: ["relatorio-meses"], queryFn: buscarMeses });
+
+  const {
+    data: campanhas = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["campanhas-atingimento", filtrosAplicados.banco, filtrosAplicados.mesInicio, filtrosAplicados.mesFim, filtrosAplicados.campanha],
+    queryFn: () => buscarAtingimento(filtrosAplicados),
+  });
+
+  function handleAtualizar() {
+    setFiltrosAplicados({ banco, mesInicio, mesFim, campanha });
+    queryClient.invalidateQueries({ queryKey: ["campanhas-atingimento"] });
+  }
+
+  const mesesDisponiveis = [...meses].sort().reverse();
+  const somaValorCampanha = campanhas.reduce((soma, c) => soma + (c.valor_campanha || 0), 0);
   const vigentes = campanhas.filter((c) => c.status === "Vigente");
+  const noTeto = campanhas.filter((c) => c.teto_atingido);
 
   return (
     <div className="fade-in">
-      <PageHeader icon={<Megaphone />} title="Campanhas — Visão geral" subtitle="Consolidado do que foi cadastrado." />
+      <PageHeader icon={<Megaphone />} title="Campanhas — Visão geral" subtitle="Produção real do período comparada às faixas de meta de cada campanha." />
+
+      <div className="card card-fit">
+        <p className="section-label">Filtros</p>
+        <div className="filter-grid">
+          <div className="form-row">
+            <label>Banco</label>
+            <select value={banco} onChange={(e) => setBanco(e.target.value)}>
+              <option value="">Todos</option>
+              {bancos.map((b) => <option key={b.valor} value={b.valor}>{b.rotulo}</option>)}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>Período — de</label>
+            <select value={mesInicio} onChange={(e) => setMesInicio(e.target.value)}>
+              {mesesDisponiveis.map((m) => <option key={m} value={m}>{mesBr(m)}</option>)}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>Período — até</label>
+            <select value={mesFim} onChange={(e) => setMesFim(e.target.value)}>
+              {mesesDisponiveis.map((m) => <option key={m} value={m}>{mesBr(m)}</option>)}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>Campanha</label>
+            <input type="text" value={campanha} onChange={(e) => setCampanha(e.target.value)} placeholder="Buscar por nome…" />
+          </div>
+          <div className="form-row form-row-action">
+            <label>&nbsp;</label>
+            <button type="button" onClick={handleAtualizar}>
+              <Refresh /> Atualizar agora
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p className="muted small" style={{ margin: "0.75rem 0 1.5rem" }}>
+        Mudar o filtro só é aplicado ao clicar em "Atualizar agora".
+      </p>
 
       {isLoading && <div className="skeleton-block" />}
-
       {isError && (
         <div className="card error-card fade-in">
           <p className="error-title">Não deu para consultar o BigQuery</p>
@@ -41,55 +134,62 @@ export default function CampanhasVisaoGeral() {
         <>
           <div className="kpi-grid">
             <div className="card kpi-card card-accent-teal">
-              <p className="kpi-label">Campanhas cadastradas</p>
-              <p className="kpi-value">{campanhas.length}</p>
+              <p className="kpi-label">Soma de valor de campanha (produção no período)</p>
+              <p className="kpi-value">{brl(somaValorCampanha)}</p>
             </div>
             <div className="card kpi-card card-accent-blue">
               <p className="kpi-label">Campanhas vigentes</p>
               <p className="kpi-value">{vigentes.length}</p>
             </div>
             <div className="card kpi-card card-accent-accent">
-              <p className="kpi-label">Critérios cadastrados</p>
-              <p className="kpi-value">{criterios.length}</p>
+              <p className="kpi-label">No teto da meta</p>
+              <p className="kpi-value">{noTeto.length}</p>
             </div>
           </div>
 
-          <div className="card">
-            <p className="section-label">Campanhas cadastradas</p>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Banco</th>
-                    <th>Campanha</th>
-                    <th>Período</th>
-                    <th>Faixas → metas</th>
-                    <th>Status</th>
+          <div className="card table-wrap-x">
+            <p className="section-label">Campanhas no período filtrado</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Banco</th>
+                  <th>Campanha</th>
+                  <th>Status</th>
+                  <th className="align-right">Valor Campanha</th>
+                  <th className="align-right">% Atingimento</th>
+                  <th className="align-right">Meta prevista</th>
+                  <th className="align-right">Valor previsto</th>
+                  <th className="align-right">Próxima meta</th>
+                  <th className="align-right">Próxima faixa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campanhas.length === 0 && (
+                  <tr><td colSpan={9} className="muted center">Nenhuma campanha encontrada para esse filtro.</td></tr>
+                )}
+                {campanhas.map((c) => (
+                  <tr key={c.id}>
+                    <td className="small">{c.banco}</td>
+                    <td className="small">{c.campanha}</td>
+                    <td className="small"><StatusChip status={c.status} /></td>
+                    <td className="mono small align-right">{brl(c.valor_campanha)}</td>
+                    <td className="mono small align-right">{c.percentual_atingimento}%</td>
+                    <td className="mono small align-right">{c.meta_prevista != null ? brl(c.meta_prevista) : "—"}</td>
+                    <td className="mono small align-right">{brl(c.valor_previsto)}</td>
+                    {c.teto_atingido ? (
+                      <td colSpan={2} className="small" style={{ color: "var(--teal)" }}>
+                        Teto da campanha atingido
+                      </td>
+                    ) : (
+                      <>
+                        <td className="mono small align-right">{c.proxima_meta != null ? brl(c.proxima_meta) : "—"}</td>
+                        <td className="mono small align-right">{c.proxima_faixa != null ? brl(c.proxima_faixa) : "—"}</td>
+                      </>
+                    )}
                   </tr>
-                </thead>
-                <tbody>
-                  {campanhas.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="muted center">Nenhuma campanha cadastrada ainda.</td>
-                    </tr>
-                  )}
-                  {campanhas.map((c) => (
-                    <tr key={c.id}>
-                      <td className="small">{c.banco}</td>
-                      <td className="small">{c.campanha}</td>
-                      <td className="mono small">{c.data_inicio || ""} — {c.data_fim || ""}</td>
-                      <td className="mono small">
-                        {(c.faixas_metas || []).map((fm) => `${brl(fm.faixa)} → ${brl(fm.meta)}`).join(" | ") || "—"}
-                      </td>
-                      <td className="small">
-                        <span className={`status-dot ${c.status === "Vigente" ? "ok" : c.status === "Finalizada" ? "" : "warn"}`} />
-                        {c.status || "Vigente"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
       )}

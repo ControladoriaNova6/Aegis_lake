@@ -112,7 +112,7 @@ export default function Relatorio() {
             <label>&nbsp;</label>
             <div className="filter-actions">
               <button type="submit" disabled={carregandoContagem}>
-                {carregandoContagem ? "Contando…" : "Atualizar contagem"}
+                {carregandoContagem ? "Atualizando…" : "Atualizar agora"}
               </button>
               <button type="button" onClick={handleBaixar} disabled={baixando}>
                 <Download /> {baixando ? "Gerando…" : "Baixar .xlsx"}

@@ -83,7 +83,7 @@ export default function Registros() {
       )}
 
       {!isLoading && !isError && (
-        <div className="card table-wrap fade-in">
+        <div className="card table-wrap fade-in" style={{ maxHeight: 640 }}>
           <table>
             <thead>
               <tr>
@@ -121,7 +121,12 @@ export default function Registros() {
                         </span>
                       ) : (
                         podeExcluir && (
-                          <button className="btn-danger" title="Excluir linhas dessa importação" onClick={() => handleExcluir(log)}>
+                          <button
+                            className="btn-danger"
+                            title="Excluir linhas dessa importação"
+                            style={{ marginLeft: "0.5rem" }}
+                            onClick={() => handleExcluir(log)}
+                          >
                             <Trash />
                           </button>
                         )

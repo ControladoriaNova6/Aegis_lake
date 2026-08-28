@@ -64,7 +64,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <img src="/grupo_nova_icon.png" className="brand-mark-img" alt="" onError={(e) => (e.target.style.display = "none")} />
+        <img src="/aegis-logo.svg" className="brand-mark-img" alt="Aegis" />
         <div className="brand-name">
           Aegis
         </div>
