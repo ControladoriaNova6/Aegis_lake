@@ -206,14 +206,81 @@ def resumo_hierarquico(banco, meses):
     return resultado
 
 
+
 def detalhamento_indicados(banco, meses):
-    """Produção detalhada por Banco | Indicado (map_indicado) | Convênio |
-    Produto — pra tela de Indicados. 'map_indicado' é a coluna de
-    tratamento calculada em Manutenção → Cruzar dados (ainda vazia pra
-    quem não foi cruzado ainda; aparece como '(sem indicado)')."""
+    """Produção detalhada por Banco > Indicado > Convênio > Produto, já
+    em formato hierárquico (níveis aninhados, cada um com subtotal) —
+    pra montar uma "planilha dinâmica" (agrupar/expandir) na tela de
+    Indicados. Só entra produção de indicados JÁ CADASTRADOS (linhas sem
+    map_indicado ficam de fora por completo — não aparece um grupo
+    "sem indicado"). 'map_indicado'/'map_convenio'/'map_produto' são as
+    colunas de tratamento calculadas em Manutenção → Cruzar dados."""
     if not meses:
         return []
 
+    linhas = _consultar_producao_por_indicado(banco, meses)
+    nomes_por_codigo = _nomes_indicados_por_codigo()
+
+    bancos_map = {}
+    for row in linhas:
+        banco_nome = row["banco"]
+        codigo = row["indicado_codigo"]
+        nome_indicado = nomes_por_codigo.get(str(codigo), str(codigo))
+        convenio = row["convenio"]
+        produto = row["produto"]
+        producao = row["producao"]
+
+        banco_node = bancos_map.setdefault(banco_nome, {"nome": banco_nome, "total": 0.0, "indicados": {}})
+        banco_node["total"] += producao
+
+        indicado_node = banco_node["indicados"].setdefault(
+            codigo, {"nome": nome_indicado, "codigo": codigo, "total": 0.0, "convenios": {}}
+        )
+        indicado_node["total"] += producao
+
+        convenio_node = indicado_node["convenios"].setdefault(convenio, {"nome": convenio, "total": 0.0, "produtos": []})
+        convenio_node["total"] += producao
+        convenio_node["produtos"].append({"nome": produto, "total": producao})
+
+    resultado = []
+    for banco_node in sorted(bancos_map.values(), key=lambda b: -b["total"]):
+        indicados_lista = []
+        for indicado_node in sorted(banco_node["indicados"].values(), key=lambda i: -i["total"]):
+            convenios_lista = sorted(indicado_node["convenios"].values(), key=lambda c: -c["total"])
+            for conv in convenios_lista:
+                conv["produtos"].sort(key=lambda p: -p["total"])
+            indicados_lista.append({**indicado_node, "convenios": convenios_lista})
+        resultado.append({**banco_node, "indicados": indicados_lista})
+
+    return resultado
+
+
+def detalhamento_indicados_flat(banco, meses):
+    """Mesma consulta de detalhamento_indicados, em formato de lista
+    plana (uma linha por Banco/Indicado/Convênio/Produto) — usado pra
+    gerar a planilha de download."""
+    if not meses:
+        return []
+
+    linhas = _consultar_producao_por_indicado(banco, meses)
+    nomes_por_codigo = _nomes_indicados_por_codigo()
+
+    return [
+        {
+            "banco": row["banco"],
+            "indicado": nomes_por_codigo.get(str(row["indicado_codigo"]), str(row["indicado_codigo"])),
+            "convenio": row["convenio"],
+            "produto": row["produto"],
+            "producao": row["producao"],
+        }
+        for row in linhas
+    ]
+
+
+def _consultar_producao_por_indicado(banco, meses):
+    """Consulta base compartilhada por detalhamento_indicados e
+    detalhamento_indicados_flat — só produção de indicados cadastrados
+    (map_indicado IS NOT NULL)."""
     from lib.manutencao import garantir_colunas_map
     garantir_colunas_map()
 
@@ -223,15 +290,16 @@ def detalhamento_indicados(banco, meses):
     query = f"""
         SELECT
           banco,
-          IFNULL(map_indicado, '(sem indicado)') AS indicado,
-          IFNULL(convenio, '(sem convênio)') AS convenio,
-          IFNULL(produto, '(sem produto)') AS produto,
+          map_indicado AS indicado_codigo,
+          IFNULL(map_convenio, '—') AS convenio,
+          IFNULL(map_produto, '—') AS produto,
           SUM(vlr_liquido) AS producao
         FROM {tabela}
         WHERE FORMAT_DATE('%Y-%m', {DATE_COLUMN}) IN UNNEST(@meses)
           AND (@banco IS NULL OR UPPER(banco) = @banco)
-        GROUP BY banco, indicado, convenio, produto
-        ORDER BY producao DESC
+          AND map_indicado IS NOT NULL
+        GROUP BY banco, indicado_codigo, convenio, produto
+        ORDER BY banco, indicado_codigo, producao DESC
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
@@ -240,13 +308,36 @@ def detalhamento_indicados(banco, meses):
         ]
     )
     rows = client.query(query, job_config=job_config).result()
+
+    # "map_indicado IS NOT NULL" só garante que a produção passou pelo
+    # cruzamento — mas o código encontrado pode não corresponder a
+    # NENHUM indicado que ainda esteja cadastrado (ex: foi excluído
+    # depois do cruzamento). Filtra de novo aqui pra garantir que só
+    # aparece produção de indicado REALMENTE cadastrado agora.
+    codigos_cadastrados = set(_nomes_indicados_por_codigo().keys())
+
     return [
         {
             "banco": row["banco"],
-            "indicado": row["indicado"],
+            "indicado_codigo": row["indicado_codigo"],
             "convenio": row["convenio"],
             "produto": row["produto"],
             "producao": float(row["producao"] or 0),
         }
         for row in rows
+        if str(row["indicado_codigo"]) in codigos_cadastrados
     ]
+
+
+def _nomes_indicados_por_codigo():
+    """Código (cod_loja) → nome cadastrado, pra não mostrar só o código
+    cru na planilha de detalhamento."""
+    from lib.indicados import listar_indicados
+    try:
+        indicados_cadastrados = listar_indicados()
+    except Exception:  # noqa: BLE001
+        return {}
+    return {
+        str(i.get("cod_loja")): (i.get("nome") or i.get("usuario") or str(i.get("cod_loja")))
+        for i in indicados_cadastrados if i.get("cod_loja")
+    }

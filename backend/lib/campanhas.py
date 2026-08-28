@@ -385,3 +385,121 @@ def excluir_criterio(id_, excluido_por=None):
     _registrar_auditoria(id_, campanha_id, "excluido", alvo or {}, excluido_por)
 
     invalidar_tudo()
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Atingimento de meta (liga a campanha à produção real da base consolidada)
+# ─────────────────────────────────────────────────────────────────────────
+def _producao_campanha(campanha, data_inicio, data_fim):
+    """Soma a produção (líquido ou bruto, conforme campanha['base_producao'])
+    do banco da campanha, no intervalo de datas dado, respeitando os
+    filtros opcionais de map_indicado/map_convenio/map_produto quando a
+    campanha tiver algum definido."""
+    from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
+    from lib.manutencao import garantir_colunas_map
+
+    garantir_colunas_map()  # garante que map_indicado/convenio/produto existem (mesmo vazias)
+
+    client = get_bigquery_client()
+    tabela = f"`{P_DASH}.{D_DASH}.{TABELA_PRINCIPAL}`"
+    coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
+
+    condicoes = [f"UPPER(banco) = @banco", f"{DATE_COLUMN} BETWEEN @data_inicio AND @data_fim"]
+    params = [
+        bigquery.ScalarQueryParameter("banco", "STRING", (campanha.get("banco") or "").upper()),
+        bigquery.ScalarQueryParameter("data_inicio", "DATE", data_inicio),
+        bigquery.ScalarQueryParameter("data_fim", "DATE", data_fim),
+    ]
+
+    mapa_filtros = {
+        "filtro_map_indicado": "map_indicado",
+        "filtro_map_convenio": "map_convenio",
+        "filtro_map_produto": "map_produto",
+    }
+    for i, (campo_filtro, coluna) in enumerate(mapa_filtros.items()):
+        valores = campanha.get(campo_filtro) or []
+        if valores:
+            nome_param = f"filtro_{i}"
+            condicoes.append(f"{coluna} IN UNNEST(@{nome_param})")
+            params.append(bigquery.ArrayQueryParameter(nome_param, "STRING", valores))
+
+    where_sql = " AND ".join(condicoes)
+    query = f"SELECT SUM({coluna_valor}) AS total FROM {tabela} WHERE {where_sql}"
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
+    linhas = list(client.query(query, job_config=job_config).result())
+    return float(linhas[0]["total"] or 0) if linhas else 0.0
+
+
+def _avaliar_faixas(faixas_metas, producao):
+    """Dado o valor já produzido, descobre em qual faixa a campanha está
+    (a maior faixa já alcançada) e qual é a próxima faixa a perseguir.
+    Faixas vêm como [{"faixa": limite_de_producao, "meta": bonus}, ...]."""
+    faixas_validas = [
+        f for f in (faixas_metas or [])
+        if f.get("faixa") is not None and f.get("meta") is not None
+    ]
+    faixas_ordenadas = sorted(faixas_validas, key=lambda f: f["faixa"])
+
+    atual = None
+    proxima = None
+    for tier in faixas_ordenadas:
+        if producao >= tier["faixa"]:
+            atual = tier
+        elif proxima is None:
+            proxima = tier
+
+    meta_prevista = atual["faixa"] if atual else (faixas_ordenadas[0]["faixa"] if faixas_ordenadas else None)
+    valor_previsto = atual["meta"] if atual else 0.0
+    proxima_meta = proxima["meta"] if proxima else None
+    proxima_faixa = proxima["faixa"] if proxima else None
+
+    if proxima_faixa:
+        percentual = (producao / proxima_faixa) * 100 if proxima_faixa else 0.0
+    elif meta_prevista:
+        percentual = 100.0
+    else:
+        percentual = 0.0
+
+    teto_atingido = bool(faixas_ordenadas) and atual is not None and proxima is None
+
+    return {
+        "percentual_atingimento": round(min(percentual, 999.0), 1),
+        "meta_prevista": meta_prevista,
+        "valor_previsto": valor_previsto,
+        "proxima_meta": proxima_meta,
+        "proxima_faixa": proxima_faixa,
+        "teto_atingido": teto_atingido,
+    }
+
+
+def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None, busca_campanha=None):
+    """Lista as campanhas (com filtro opcional de banco/campanha) já
+    calculando, pra cada uma, quanto de produção real bateu no período
+    filtrado — e o que falta pra próxima faixa de bônus."""
+    campanhas = listar_campanhas()
+
+    if banco:
+        campanhas = [c for c in campanhas if (c.get("banco") or "").upper() == banco.upper()]
+    if busca_campanha:
+        termo = busca_campanha.lower()
+        campanhas = [c for c in campanhas if termo in (c.get("campanha") or "").lower()]
+
+    resultado = []
+    for campanha in campanhas:
+        di = data_inicio or campanha.get("data_inicio")
+        df = data_fim or campanha.get("data_fim")
+
+        if not di or not df:
+            producao = 0.0
+        else:
+            producao = _producao_campanha(campanha, di, df)
+
+        avaliacao = _avaliar_faixas(campanha.get("faixas_metas"), producao)
+
+        resultado.append({
+            **campanha,
+            "valor_campanha": producao,
+            **avaliacao,
+        })
+
+    return resultado

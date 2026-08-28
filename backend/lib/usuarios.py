@@ -126,8 +126,9 @@ def verificar_login(email, senha):
 def adicionar_usuario(email, nome, papel, criado_por, senha=None):
     """Adiciona um usuário novo ou edita um já existente (upsert por
     e-mail). Se `senha` vier preenchida, define/reseta a senha; se vier
-    vazia ao EDITAR um usuário que já existe, mantém a senha antiga. Pra
-    um usuário NOVO, senha é obrigatória."""
+    vazia, mantém a senha antiga (se já existir) ou deixa em branco (pra
+    um usuário novo — a pessoa define a própria senha no primeiro
+    acesso, o admin não precisa mais saber/inventar uma senha por ela)."""
     if papel not in PAPEIS_VALIDOS:
         raise ValueError(f'Papel inválido: "{papel}". Use um de: {", ".join(PAPEIS_VALIDOS)}.')
 
@@ -142,7 +143,7 @@ def adicionar_usuario(email, nome, papel, criado_por, senha=None):
     elif existente:
         senha_hash = existente.get("senha_hash")
     else:
-        raise ValueError("Defina uma senha para o novo usuário.")
+        senha_hash = None  # usuário novo, sem senha ainda — aguardando primeiro acesso
 
     _remover_usuario(client, table_id, email)
 
@@ -158,6 +159,32 @@ def adicionar_usuario(email, nome, papel, criado_por, senha=None):
     client.load_table_from_dataframe(df, table_id, job_config=job_config).result()
 
     invalidar_tudo()
+
+
+def definir_senha_primeiro_acesso(email, senha_nova):
+    """Fluxo de primeiro acesso: a pessoa informa o e-mail (cadastrado
+    pelo admin, sem senha) e cria a própria senha. Só funciona se o
+    e-mail existir E ainda não tiver senha definida — se já tiver senha,
+    isso não é "primeiro acesso" mais, então bloqueia (a pessoa deveria
+    usar "Redefinir senha" logada, ou pedir pro admin resetar).
+
+    Nota de segurança: como não enviamos e-mail de verificação, esse
+    fluxo confia que só a própria pessoa conhece o e-mail dela — é
+    razoável pra uma ferramenta interna onde só o admin cria contas, mas
+    vale lembrar que não há confirmação de identidade além do e-mail
+    em si."""
+    email = (email or "").strip().lower()
+    usuario = obter_usuario_por_email(email)
+    if not usuario:
+        raise ValueError("E-mail não encontrado. Confira com o administrador se sua conta já foi cadastrada.")
+
+    if usuario.get("senha_hash"):
+        raise ValueError("Essa conta já tem senha definida. Use \"Esqueci minha senha\" ou peça pro administrador redefinir.")
+
+    if not senha_nova or len(senha_nova) < 4:
+        raise ValueError("A senha precisa ter pelo menos 4 caracteres.")
+
+    adicionar_usuario(email, usuario.get("nome"), usuario.get("papel"), criado_por=email, senha=senha_nova)
 
 
 def redefinir_propria_senha(email, senha_atual, senha_nova):

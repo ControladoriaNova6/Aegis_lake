@@ -10,6 +10,7 @@ from lib.campanhas import (
     salvar_criterio,
     excluir_criterio,
     listar_auditoria_criterios,
+    listar_campanhas_com_atingimento,
     CAMPOS_CAMPANHA,
     CAMPOS_CRITERIO,
     CAMPOS_FILTRO_PRODUCAO,
@@ -29,6 +30,26 @@ def campanhas_listar():
         return jsonify(listar_campanhas())
     except Exception as exc:  # noqa: BLE001
         return jsonify({"erro": str(exc)}), 500
+
+
+@bp_campanhas.route("/campanhas/atingimento")
+@login_required
+def campanhas_atingimento():
+    """Campanhas + produção real do período + avaliação de faixa/meta —
+    usado na Visão geral de Campanhas (cards e tabela)."""
+    banco = request.args.get("banco") or None
+    data_inicio = request.args.get("data_inicio") or None
+    data_fim = request.args.get("data_fim") or None
+    busca_campanha = request.args.get("campanha") or None
+
+    try:
+        linhas = listar_campanhas_com_atingimento(
+            banco=banco, data_inicio=data_inicio, data_fim=data_fim, busca_campanha=busca_campanha,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500
+
+    return jsonify(linhas)
 
 
 @bp_campanhas.route("/campanhas", methods=["POST"])

@@ -13,8 +13,11 @@ def usuarios_listar():
         usuarios = listar_usuarios()
     except Exception as exc:  # noqa: BLE001
         return jsonify({"erro": str(exc)}), 500
-    # nunca devolve o hash da senha pro front
-    return jsonify([{k: v for k, v in u.items() if k != "senha_hash"} for u in usuarios])
+    # nunca devolve o hash da senha pro front — só se a conta já foi ativada
+    return jsonify([
+        {**{k: v for k, v in u.items() if k != "senha_hash"}, "tem_senha": bool(u.get("senha_hash"))}
+        for u in usuarios
+    ])
 
 
 @bp_usuarios.route("/usuarios", methods=["POST"])

@@ -2,7 +2,7 @@ import functools
 
 from flask import Blueprint, request, session, jsonify
 
-from lib.usuarios import verificar_login, redefinir_propria_senha
+from lib.usuarios import verificar_login, redefinir_propria_senha, definir_senha_primeiro_acesso
 
 bp_auth = Blueprint("auth", __name__, url_prefix="/api")
 
@@ -26,6 +26,27 @@ def login():
 
     session["usuario"] = usuario
     return jsonify(usuario)
+
+
+@bp_auth.route("/primeiro-acesso", methods=["POST"])
+def primeiro_acesso():
+    """Rota pública (sem login) — a pessoa informa o e-mail que o admin
+    já cadastrou (sem senha) e cria a própria senha."""
+    dados = request.get_json(silent=True) or {}
+    email = (dados.get("email") or "").strip().lower()
+    senha_nova = dados.get("senha_nova") or ""
+
+    if not email:
+        return jsonify({"erro": "Informe seu e-mail."}), 400
+
+    try:
+        definir_senha_primeiro_acesso(email, senha_nova)
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": f"Não deu para consultar o BigQuery: {exc}"}), 500
+
+    return jsonify({"ok": True})
 
 
 @bp_auth.route("/logout", methods=["POST"])
