@@ -189,7 +189,7 @@ export default function Parametros() {
 
       {/* ── Listagem: somente leitura, com botão de editar/excluir por linha ── */}
       {!isLoading && !isError && (
-        <div className="card table-wrap fade-in">
+        <div className="card table-wrap fade-in" style={{ maxHeight: 640 }}>
           <table>
             <thead>
               <tr>

@@ -570,6 +570,13 @@ td {
   color: var(--red);
 }
 
+.field-hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 .form-row input.input-com-erro,
 .form-row select.input-com-erro {
   border-color: var(--red);

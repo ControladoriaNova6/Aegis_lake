@@ -160,7 +160,7 @@ export default function Login() {
       }}
     >
       <div className="card" style={{ width: 340 }}>
-        <img src="/aegis-logo.svg" alt="Aegis" style={{ width: 48, height: 48, display: "block", margin: "0 auto 1rem" }} />
+        <img src="/aegis-logo.png" alt="Aegis" style={{ width: 52, height: "auto", display: "block", margin: "0 auto 1rem" }} />
         <p className="section-title" style={{ margin: "0 0 0.25rem", textAlign: "center" }}>
           Aegis
         </p>

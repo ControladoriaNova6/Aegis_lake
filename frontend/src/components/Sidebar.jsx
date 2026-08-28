@@ -64,7 +64,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <img src="/aegis-logo.svg" className="brand-mark-img" alt="Aegis" />
+        <img src="/aegis-logo.png" className="brand-mark-img" alt="Aegis" />
         <div className="brand-name">
           Aegis
         </div>

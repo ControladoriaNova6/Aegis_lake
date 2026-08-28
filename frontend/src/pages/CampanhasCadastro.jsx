@@ -5,7 +5,7 @@ import api from "../api/client";
 import PageHeader from "../components/PageHeader";
 import MultiSelectDropdown from "../components/MultiSelectDropdown";
 import Modal from "../components/Modal";
-import { Plus, Trash, Settings, DollarSign } from "../components/icons";
+import { Plus, Trash, Settings, DollarSign, Download } from "../components/icons";
 import { brl } from "../utils/format";
 
 const STATUS_OPCOES = ["Vigente", "Finalizada", "Em Apuração"];
@@ -136,6 +136,29 @@ export default function CampanhasCadastro() {
     setMensagemValoresAbertos(null);
   }
 
+  const [baixandoApuracaoId, setBaixandoApuracaoId] = useState(null);
+
+  async function handleBaixarApuracao(campanha) {
+    setBaixandoApuracaoId(campanha.id);
+    try {
+      const response = await api.get(`/campanhas/${campanha.id}/relatorio-apuracao/download`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const nomeArquivo = campanha.campanha.replace(/[^a-zA-Z0-9]/g, "_");
+      const dataStr = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      link.setAttribute("download", `apuracao_${nomeArquivo}_${dataStr}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setMensagem({ ok: false, texto: err?.response?.data?.erro || "Não foi possível gerar o relatório." });
+    } finally {
+      setBaixandoApuracaoId(null);
+    }
+  }
+
   function handleSalvarValorAberto(e) {
     e.preventDefault();
     if (!formValoresAbertos.banco || !formValoresAbertos.categoria || !formValoresAbertos.valor || !formValoresAbertos.data_prevista) {
@@ -241,10 +264,12 @@ export default function CampanhasCadastro() {
               <option value="">Selecione…</option>
               {bancos.map((b) => <option key={b.valor} value={b.valor}>{b.rotulo}</option>)}
             </select>
+            <span className="field-hint">Obrigatório</span>
           </div>
           <div className="form-row">
             <label>Campanha</label>
             <input type="text" value={form.campanha} onChange={(e) => handleChange("campanha", e.target.value)} placeholder="Nome da campanha" />
+            <span className="field-hint">Obrigatório</span>
           </div>
           <div className="form-row">
             <label>Data início</label>
@@ -290,9 +315,7 @@ export default function CampanhasCadastro() {
           Qual produção conta pro atingimento de meta (opcional)
         </p>
         <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-          Sem nada selecionado, considera toda a produção do banco no período. Selecionando algo, filtra só o que bater
-          com os valores escolhidos. Essas opções vêm do cruzamento de dados feito em Manutenção — enquanto isso não
-          for rodado pra Convênio/Produto, as listas ficam vazias.
+          Sem seleção, considera toda a produção do banco no período.
         </p>
         <div className="filter-grid">
           <div className="form-row">
@@ -372,6 +395,15 @@ export default function CampanhasCadastro() {
                     </button>
                     <button className="btn-link" onClick={() => abrirModalValoresAbertos(c)} title="Adicionar aos valores em aberto" style={{ marginRight: "0.4rem" }}>
                       <DollarSign />
+                    </button>
+                    <button
+                      className="btn-link"
+                      onClick={() => handleBaixarApuracao(c)}
+                      title="Baixar relatório de apuração por proposta"
+                      disabled={baixandoApuracaoId === c.id}
+                      style={{ marginRight: "0.4rem" }}
+                    >
+                      <Download />
                     </button>
                     <button className="btn-danger" onClick={() => { if (window.confirm(`Remover a campanha "${c.campanha}"?`)) excluirMutation.mutate(c.id); }} title="Excluir">
                       <Trash />

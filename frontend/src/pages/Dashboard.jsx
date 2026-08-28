@@ -149,11 +149,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <p className="muted small" style={{ margin: "0.75rem 0 1.5rem" }}>
-        Mudar o banco ou o período só é aplicado quando você clica em &quot;Atualizar agora&quot; — os dados ficam
-        guardados na memória do navegador enquanto essa aba estiver aberta.
-      </p>
-
       {isLoading && <div className="skeleton-block" />}
 
       {isError && (
@@ -193,10 +188,10 @@ export default function Dashboard() {
                   type: "scatter",
                   mode: "lines+markers",
                   line: { color: "#94a3b8", width: 2 },
-                  marker: { size: 4 },
+                  marker: { size: 4, color: "#94a3b8" },
                   fill: "tozeroy",
                   fillcolor: "rgba(148, 163, 184, 0.12)",
-                  hovertemplate: "%{x}<br>R$ %{y:,.2f}<extra></extra>",
+                  hovertemplate: "%{x|%d/%m/%Y}<br>R$ %{y:,.2f}<extra></extra>",
                 },
               ]}
               layout={{
@@ -204,8 +199,15 @@ export default function Dashboard() {
                 plot_bgcolor: "#131826",
                 font: { color: "#E4E7EE", family: "'DM Sans', -apple-system, sans-serif", size: 12 },
                 margin: { l: 40, r: 20, t: 20, b: 40 },
-                xaxis: { gridcolor: "#232B3D" },
-                yaxis: { gridcolor: "#232B3D" },
+                xaxis: {
+                  gridcolor: "#232B3D",
+                  zerolinecolor: "#232B3D",
+                  linecolor: "#232B3D",
+                  tickformat: "%d/%m",
+                  hoverformat: "%d/%m/%Y",
+                },
+                yaxis: { gridcolor: "#232B3D", zerolinecolor: "#232B3D", linecolor: "#232B3D" },
+                hoverlabel: { bgcolor: "#1a2030", bordercolor: "#232B3D", font: { color: "#E4E7EE" } },
                 height: 300,
                 showlegend: false,
               }}

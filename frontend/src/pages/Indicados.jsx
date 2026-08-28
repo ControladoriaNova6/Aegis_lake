@@ -40,6 +40,7 @@ export default function Indicados() {
 
   const atual = mesAtual();
   const [filtroDetBanco, setFiltroDetBanco] = useState("");
+  const [filtroCodigoIndicado, setFiltroCodigoIndicado] = useState("");
   const [filtroDetMesInicio, setFiltroDetMesInicio] = useState(atual);
   const [filtroDetMesFim, setFiltroDetMesFim] = useState(atual);
   const [detalhamentoAplicado, setDetalhamentoAplicado] = useState({ banco: "", mesInicio: atual, mesFim: atual });
@@ -128,6 +129,17 @@ export default function Indicados() {
     e.preventDefault();
     setBuscaAtiva(busca);
   }
+
+  const termoCodigo = filtroCodigoIndicado.trim().toLowerCase();
+  const bancosFiltrados = !termoCodigo
+    ? detalhamento?.bancos || []
+    : (detalhamento?.bancos || [])
+        .map((bancoItem) => {
+          const indicados = bancoItem.indicados.filter((i) => String(i.codigo).toLowerCase().includes(termoCodigo));
+          const total = indicados.reduce((soma, i) => soma + i.total, 0);
+          return { ...bancoItem, indicados, total };
+        })
+        .filter((bancoItem) => bancoItem.indicados.length > 0);
 
   return (
     <div className="fade-in">
@@ -239,6 +251,15 @@ export default function Indicados() {
               {[...mesesDetalhamento].sort().reverse().map((m) => <option key={m} value={m}>{mesBr(m)}</option>)}
             </select>
           </div>
+          <div className="form-row">
+            <label>Código do indicado</label>
+            <input
+              type="text"
+              value={filtroCodigoIndicado}
+              onChange={(e) => setFiltroCodigoIndicado(e.target.value)}
+              placeholder="ex: 7"
+            />
+          </div>
           <div className="form-row form-row-action">
             <label>&nbsp;</label>
             <div className="filter-actions">
@@ -254,8 +275,8 @@ export default function Indicados() {
       </div>
 
       <p className="muted small" style={{ margin: "0.75rem 0 1.5rem" }}>
-        Mudar o filtro só é aplicado ao clicar em "Atualizar agora". Só entra aqui produção de indicados já
-        cadastrados — quem ainda não passou pelo cruzamento de dados em Manutenção não aparece.
+        Só entra aqui produção de indicados já cadastrados — quem ainda não passou pelo cruzamento de dados em
+        Manutenção não aparece.
       </p>
 
       {carregandoDetalhamento && <div className="skeleton-block" />}
@@ -269,13 +290,13 @@ export default function Indicados() {
       {detalhamento && !erroDetalhamento && (
         <div className="card">
           <p className="section-label">Banco → Indicado → Convênio → Produto</p>
-          {detalhamento.bancos.length === 0 ? (
+          {bancosFiltrados.length === 0 ? (
             <p className="muted center" style={{ padding: "1.5rem 0" }}>
-              Nenhuma produção de indicado cadastrado para os filtros selecionados.
+              {termoCodigo ? "Nenhum indicado encontrado com esse código." : "Nenhuma produção de indicado cadastrado para os filtros selecionados."}
             </p>
           ) : (
             <div className="accordion">
-              {detalhamento.bancos.map((bancoItem) => (
+              {bancosFiltrados.map((bancoItem) => (
                 <details key={bancoItem.nome} className="accordion-item level-banco">
                   <summary>
                     <span>{bancoItem.nome}</span>

@@ -118,10 +118,6 @@ export default function CampanhasVisaoGeral() {
         </div>
       </div>
 
-      <p className="muted small" style={{ margin: "0.75rem 0 1.5rem" }}>
-        Mudar o filtro só é aplicado ao clicar em "Atualizar agora".
-      </p>
-
       {isLoading && <div className="skeleton-block" />}
       {isError && (
         <div className="card error-card fade-in">
@@ -154,6 +150,8 @@ export default function CampanhasVisaoGeral() {
                 <tr>
                   <th>Banco</th>
                   <th>Campanha</th>
+                  <th>Map Convênio</th>
+                  <th>Map Produto</th>
                   <th>Status</th>
                   <th className="align-right">Valor Campanha</th>
                   <th className="align-right">% Atingimento</th>
@@ -165,12 +163,14 @@ export default function CampanhasVisaoGeral() {
               </thead>
               <tbody>
                 {campanhas.length === 0 && (
-                  <tr><td colSpan={9} className="muted center">Nenhuma campanha encontrada para esse filtro.</td></tr>
+                  <tr><td colSpan={11} className="muted center">Nenhuma campanha encontrada para esse filtro.</td></tr>
                 )}
                 {campanhas.map((c) => (
                   <tr key={c.id}>
                     <td className="small">{c.banco}</td>
                     <td className="small">{c.campanha}</td>
+                    <td className="small">{c.filtro_map_convenio?.length ? c.filtro_map_convenio.join(", ") : "Todos"}</td>
+                    <td className="small">{c.filtro_map_produto?.length ? c.filtro_map_produto.join(", ") : "Todos"}</td>
                     <td className="small"><StatusChip status={c.status} /></td>
                     <td className="mono small align-right">{brl(c.valor_campanha)}</td>
                     <td className="mono small align-right">{c.percentual_atingimento}%</td>

@@ -318,6 +318,15 @@ export default function CampanhasCriterios() {
                       </div>
                     </td>
                   </tr>
+                  <tr>
+                    <td className="form-table-label">Status</td>
+                    <td>
+                      <select value={form.status} onChange={(e) => handleChange("status", e.target.value)}>
+                        <option value="ativo">Ativo</option>
+                        <option value="nao_contabilizar">Não contabilizar</option>
+                      </select>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
 
