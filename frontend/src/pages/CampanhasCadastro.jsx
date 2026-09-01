@@ -6,7 +6,7 @@ import PageHeader from "../components/PageHeader";
 import MultiSelectDropdown from "../components/MultiSelectDropdown";
 import Modal from "../components/Modal";
 import { Plus, Trash, Settings, DollarSign, Download } from "../components/icons";
-import { brl } from "../utils/format";
+import { brl, percentual } from "../utils/format";
 
 const STATUS_OPCOES = ["Vigente", "Finalizada", "Em Apuração"];
 
@@ -242,7 +242,7 @@ export default function CampanhasCadastro() {
 
   return (
     <div className="fade-in">
-      <PageHeader icon={<Plus />} title="Cadastro de campanha" subtitle="Cadastre, edite ou remova campanhas e seus bônus por faixa." />
+      <PageHeader icon={<Plus />} title="Cadastro" subtitle="Cadastre, edite ou remova campanhas e seus bônus por faixa." />
 
       {mensagem && (
         <div className={`fade-in ${mensagem.ok ? "card status-card-ok" : "card error-card"}`}>
@@ -289,15 +289,18 @@ export default function CampanhasCadastro() {
         </div>
 
         <p className="section-label" style={{ marginTop: "1rem" }}>Faixas e metas (bônus por faixa atingida)</p>
+        <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
+          Meta = produção (R$) que precisa ser alcançada. Faixa = percentual de bônus pago quando essa meta é batida.
+        </p>
         {form.faixas_metas.map((fm, index) => (
           <div className="filter-grid fade-in" key={index} style={{ marginBottom: "0.5rem", alignItems: "flex-end" }}>
             <div className="form-row">
-              <label>Faixa {index + 1}</label>
-              <input type="number" value={fm.faixa} onChange={(e) => handleChangeFaixaMeta(index, "faixa", e.target.value)} />
+              <label>Meta {index + 1} (R$ de produção)</label>
+              <input type="number" value={fm.meta} onChange={(e) => handleChangeFaixaMeta(index, "meta", e.target.value)} placeholder="Ex: 100000000" />
             </div>
             <div className="form-row">
-              <label>Meta {index + 1}</label>
-              <input type="number" value={fm.meta} onChange={(e) => handleChangeFaixaMeta(index, "meta", e.target.value)} />
+              <label>Faixa {index + 1} (% de bônus)</label>
+              <input type="number" step="0.01" value={fm.faixa} onChange={(e) => handleChangeFaixaMeta(index, "faixa", e.target.value)} placeholder="Ex: 0.30" />
             </div>
             <div className="form-row form-row-action">
               <label>&nbsp;</label>
@@ -366,7 +369,7 @@ export default function CampanhasCadastro() {
         <div className="card table-wrap fade-in">
           <table>
             <thead>
-              <tr><th>Banco</th><th>Campanha</th><th>Período</th><th>Faixas → metas</th><th>Status</th><th></th></tr>
+              <tr><th>Banco</th><th>Campanha</th><th>Período</th><th>Metas → faixas</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {campanhas.length === 0 && (
@@ -378,7 +381,7 @@ export default function CampanhasCadastro() {
                   <td className="small">{c.campanha}</td>
                   <td className="mono small">{c.data_inicio || ""} — {c.data_fim || ""}</td>
                   <td className="mono small">
-                    {(c.faixas_metas || []).map((fm) => `${brl(fm.faixa)} → ${brl(fm.meta)}`).join(" | ") || "—"}
+                    {(c.faixas_metas || []).map((fm) => `${brl(fm.meta)} → ${percentual(fm.faixa)}`).join(" | ") || "—"}
                   </td>
                   <td className="small">
                     <select

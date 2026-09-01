@@ -195,8 +195,8 @@ export default function Dashboard() {
                 },
               ]}
               layout={{
-                paper_bgcolor: "#131826",
-                plot_bgcolor: "#131826",
+                paper_bgcolor: "rgba(0,0,0,0)",
+                plot_bgcolor: "rgba(0,0,0,0)",
                 font: { color: "#E4E7EE", family: "'DM Sans', -apple-system, sans-serif", size: 12 },
                 margin: { l: 40, r: 20, t: 20, b: 40 },
                 xaxis: {

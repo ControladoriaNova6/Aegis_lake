@@ -99,6 +99,21 @@ def listar_valores_abertos():
     return [dict(row) for row in rows]
 
 
+def _para_date(valor):
+    """Converte "2026-08-20" (string do <input type="date">) em
+    datetime.date de verdade — sem isso, a carga real no BigQuery falha
+    (a coluna vai como STRING, não bate com o tipo DATE da tabela)."""
+    if valor in (None, ""):
+        return None
+    if isinstance(valor, date):
+        return valor
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, str):
+        return datetime.strptime(valor.strip()[:10], "%Y-%m-%d").date()
+    return valor
+
+
 def criar_lancamento(dados, criado_por, campanha_id=None):
     if dados.get("categoria") not in CATEGORIAS_VALIDAS:
         raise ValueError(f'Categoria inválida. Use uma de: {", ".join(CATEGORIAS_VALIDAS)}.')
@@ -115,6 +130,7 @@ def criar_lancamento(dados, criado_por, campanha_id=None):
 
     linha = {campo: dados.get(campo) for campo in CAMPOS_LANCAMENTO}
     linha["valor"] = float(linha["valor"])
+    linha["data_prevista"] = _para_date(linha["data_prevista"])
     linha.update({
         "id": uuid.uuid4().hex,
         "status": "aberto",

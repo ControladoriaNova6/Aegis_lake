@@ -1358,3 +1358,72 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.table-toolbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.table-toolbar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.table-toolbar-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}
+
+.table-toolbar-slider input[type="range"] {
+  width: 110px;
+}
+
+/* ── Campanhas Visão Geral: 3 blocos de cenário na mesma tabela ─────────
+   Cenário Atual / Projeção / Oportunidades — sem cor por bloco, só uma
+   divisória vertical entre eles (o texto continua neutro, na mesma cor
+   do resto da tabela). Densidade controlada por --tabela-escala (ver
+   controle de "Densidade" acima da tabela). */
+.table-blocos {
+  min-width: 1500px;
+  font-size: calc(0.82rem * var(--tabela-escala, 1));
+}
+
+.table-blocos th,
+.table-blocos td {
+  padding: calc(0.4rem * var(--tabela-escala, 1)) calc(0.55rem * var(--tabela-escala, 1));
+}
+
+.bloco-header {
+  text-align: center;
+  border-bottom: 2px solid var(--border-strong);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Divisória vertical no início de cada bloco (marcada explicitamente na
+   primeira coluna de cada bloco via classe .bloco-divisor) */
+.bloco-divisor {
+  border-left: 1px solid var(--border-strong);
+}
+
+.table-blocos tbody tr:nth-child(even) {
+  background: color-mix(in oklab, var(--surface-raised) 45%, transparent);
+}

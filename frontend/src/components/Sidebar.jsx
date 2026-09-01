@@ -90,7 +90,7 @@ export default function Sidebar() {
           </summary>
           <div className="nav-group-items">
             <Item to="/campanhas" icon={<Grid />} papel={papel}>Visão geral</Item>
-            <Item to="/campanhas/cadastro" icon={<Grid />} papel={papel}>Cadastro campanha</Item>
+            <Item to="/campanhas/cadastro" icon={<Plus />} papel={papel}>Cadastro</Item>
             <Item to="/campanhas/criterios" icon={<Settings />} papel={papel}>Critérios</Item>
           </div>
         </details>

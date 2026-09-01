@@ -2,7 +2,7 @@ import json
 import os
 import threading
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 from google.cloud import bigquery
@@ -163,15 +163,41 @@ def _remover_por_id(nome_tabela, id_):
         client.query(rebuild_query, job_config=job_config2).result()
 
 
-def _preparar_linha(dados, campos, campos_numero):
+def _preparar_linha(dados, campos, campos_numero, campos_data=None):
+    """Monta a linha a partir do que veio do formulário. Campos de data
+    (ex: "2026-08-01", como vem de <input type="date">) precisam virar
+    datetime.date de verdade antes de ir pro BigQuery — passar a string
+    crua funciona nos testes locais (o simulador não valida tipo), mas
+    falha na carga real: load_table_from_dataframe serializa a coluna
+    como STRING quando os valores são str, e isso não bate com o tipo
+    DATE da tabela de destino."""
+    campos_data = campos_data or []
     linha = {}
     for campo in campos:
         valor = dados.get(campo)
         if campo in campos_numero:
             linha[campo] = float(valor) if valor not in (None, "") else None
+        elif campo in campos_data:
+            linha[campo] = _para_date(valor)
         else:
             linha[campo] = (valor or "").strip() if isinstance(valor, str) else valor
     return linha
+
+
+def _para_date(valor):
+    """Converte "2026-08-01" (string do <input type="date">) em
+    datetime.date. Aceita None/"" (campo de data opcional, tipo Data fim
+    de um critério) e também já aceita um date/datetime pronto (não
+    quebra se já vier convertido)."""
+    if valor in (None, ""):
+        return None
+    if isinstance(valor, date):
+        return valor
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, str):
+        return datetime.strptime(valor.strip()[:10], "%Y-%m-%d").date()
+    return valor
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -221,7 +247,7 @@ def salvar_campanha(dados, criado_por, id_existente=None):
     if id_existente:
         _remover_por_id(TABELA_CAMPANHAS, id_existente)
 
-    linha = _preparar_linha(dados, CAMPOS_CAMPANHA, CAMPOS_CAMPANHA_NUMERO)
+    linha = _preparar_linha(dados, CAMPOS_CAMPANHA, CAMPOS_CAMPANHA_NUMERO, CAMPOS_CAMPANHA_DATA)
 
     if linha.get("status") not in STATUS_CAMPANHA_VALIDOS:
         linha["status"] = STATUS_CAMPANHA_PADRAO
@@ -353,7 +379,7 @@ def salvar_criterio(dados, criado_por, id_existente=None):
     if id_existente:
         _remover_por_id(TABELA_CRITERIOS, id_existente)
 
-    linha = _preparar_linha(dados, CAMPOS_CRITERIO, CAMPOS_CRITERIO_NUMERO)
+    linha = _preparar_linha(dados, CAMPOS_CRITERIO, CAMPOS_CRITERIO_NUMERO, CAMPOS_CRITERIO_DATA)
 
     if linha.get("valor_base") not in BASE_PRODUCAO_VALIDOS:
         # Se o critério não escolheu explicitamente, herda o padrão da
@@ -391,28 +417,19 @@ def excluir_criterio(id_, excluido_por=None):
 # Atingimento de meta (liga a campanha à produção real da base consolidada)
 # ─────────────────────────────────────────────────────────────────────────
 @cached()
-def _producao_campanha(campanha, data_inicio, data_fim):
-    """Soma a produção (líquido ou bruto, conforme campanha['base_producao'])
-    do banco da campanha, no intervalo de datas dado, respeitando os
-    filtros opcionais de map_indicado/map_convenio/map_produto quando a
-    campanha tiver algum definido.
-
-    Tem cache: sem isso, toda vez que a Visão geral de Campanhas é
-    carregada, o backend fazia UMA CONSULTA NOVA AO BIGQUERY PRA CADA
-    CAMPANHA, em sequência (se você tem 10 campanhas, são 10 idas e
-    voltas ao banco antes da página responder) — essa é a causa mais
-    provável de qualquer lentidão sentida nessa tela. Com @cached(), a
-    mesma campanha + mesmo período só consulta de verdade uma vez; depois
-    fica instantâneo até algo mudar (nova importação, edição de campanha)
-    ou a pessoa clicar em "Atualizar agora"."""
+def _detalhes_producao_campanha(campanha, data_inicio, data_fim):
+    """Busca as linhas de produção da campanha (banco + período + filtros
+    opcionais de map_indicado/map_convenio/map_produto), já com os campos
+    necessários pra casar cada linha com um critério (mesma lógica do
+    relatório de apuração) e pra calcular a projeção (data de cada
+    linha)."""
     from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
     from lib.manutencao import garantir_colunas_map
 
-    garantir_colunas_map()  # garante que map_indicado/convenio/produto existem (mesmo vazias)
+    garantir_colunas_map()
 
     client = get_bigquery_client()
     tabela = f"`{P_DASH}.{D_DASH}.{TABELA_PRINCIPAL}`"
-    coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
 
     condicoes = [f"UPPER(banco) = @banco", f"{DATE_COLUMN} BETWEEN @data_inicio AND @data_fim"]
     params = [
@@ -434,58 +451,225 @@ def _producao_campanha(campanha, data_inicio, data_fim):
             params.append(bigquery.ArrayQueryParameter(nome_param, "STRING", valores))
 
     where_sql = " AND ".join(condicoes)
-    query = f"SELECT SUM({coluna_valor}) AS total FROM {tabela} WHERE {where_sql}"
+    query = f"""
+        SELECT {DATE_COLUMN} AS data_pagamento, convenio, produto, cod_tabela, tabela, vlr_liquido, vlr_bruto
+        FROM {tabela}
+        WHERE {where_sql}
+    """
     job_config = bigquery.QueryJobConfig(query_parameters=params)
-    linhas = list(client.query(query, job_config=job_config).result())
-    return float(linhas[0]["total"] or 0) if linhas else 0.0
+    rows = client.query(query, job_config=job_config).result()
+    return [dict(row) for row in rows]
 
 
 def _avaliar_faixas(faixas_metas, producao):
     """Dado o valor já produzido, descobre em qual faixa a campanha está
-    (a maior faixa já alcançada) e qual é a próxima faixa a perseguir.
-    Faixas vêm como [{"faixa": limite_de_producao, "meta": bonus}, ...]."""
+    (a maior meta de produção já alcançada) e qual é a próxima a
+    perseguir.
+
+    Faixas vêm como [{"faixa": percentual_de_bonus, "meta": limite_de_producao_em_reais}, ...]:
+      - "meta"  → o QUANTO precisa produzir (R$) pra entrar nessa faixa.
+        É por isso que a comparação com a produção usa "meta", não
+        "faixa" — comparar com "faixa" (que é um percentual, tipicamente
+        bem menor que qualquer produção real) fazia qualquer produção
+        "bater" a primeira faixa quase de imediato, mesmo sem a meta
+        real ter sido alcançada.
+      - "faixa" → o percentual de bônus pago quando aquela meta é
+        atingida. Por isso "faixa_atingida" é sempre um percentual, e
+        tem que voltar 0 (não a faixa mais baixa, nem None) quando
+        nenhuma meta ainda foi batida.
+    """
     faixas_validas = [
         f for f in (faixas_metas or [])
         if f.get("faixa") is not None and f.get("meta") is not None
     ]
-    faixas_ordenadas = sorted(faixas_validas, key=lambda f: f["faixa"])
+    faixas_ordenadas = sorted(faixas_validas, key=lambda f: f["meta"])
 
     atual = None
     proxima = None
     for tier in faixas_ordenadas:
-        if producao >= tier["faixa"]:
+        if producao >= tier["meta"]:
             atual = tier
         elif proxima is None:
             proxima = tier
 
-    meta_prevista = atual["faixa"] if atual else (faixas_ordenadas[0]["faixa"] if faixas_ordenadas else None)
-    valor_previsto = atual["meta"] if atual else 0.0
+    tier_atingido = atual is not None
+    faixa_atingida = atual["faixa"] if atual else 0.0
+    meta_atingida = atual["meta"] if atual else 0.0
     proxima_meta = proxima["meta"] if proxima else None
     proxima_faixa = proxima["faixa"] if proxima else None
 
-    if proxima_faixa:
-        percentual = (producao / proxima_faixa) * 100 if proxima_faixa else 0.0
-    elif meta_prevista:
+    if proxima_meta:
+        percentual = (producao / proxima_meta) * 100
+    elif tier_atingido:
         percentual = 100.0
     else:
         percentual = 0.0
 
-    teto_atingido = bool(faixas_ordenadas) and atual is not None and proxima is None
+    teto_atingido = bool(faixas_ordenadas) and tier_atingido and proxima is None
 
     return {
         "percentual_atingimento": round(min(percentual, 999.0), 1),
-        "meta_prevista": meta_prevista,
-        "valor_previsto": valor_previsto,
+        "faixa_atingida": round(faixa_atingida, 2),
+        "meta_atingida": round(meta_atingida, 2),
         "proxima_meta": proxima_meta,
         "proxima_faixa": proxima_faixa,
         "teto_atingido": teto_atingido,
+        "tier_atingido": tier_atingido,
+    }
+
+
+def _dias_uteis_entre(data_inicio, data_fim):
+    """Conta dias úteis (segunda a sexta), inclusive nas duas pontas."""
+    if not data_inicio or not data_fim or data_inicio > data_fim:
+        return 0
+    dias = 0
+    atual = data_inicio
+    while atual <= data_fim:
+        if atual.weekday() < 5:  # 0=segunda ... 6=domingo
+            dias += 1
+        atual += timedelta(days=1)
+    return dias
+
+
+@cached()
+def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
+    """Calcula os 3 cenários financeiros de uma campanha:
+
+    1. CENÁRIO ATUAL — o que já foi produzido e o que está previsto pra
+       receber com base nisso.
+    2. PROJEÇÃO — o que se espera até o fim da campanha, projetando a
+       média diária de produção (calculada só sobre os dias que
+       realmente tiveram produção) pelos dias úteis que restam. A data
+       de referência pra "quantos dias faltam" é sempre a data mais
+       recente que já tem produção importada — não a data de hoje —
+       porque a importação pode estar alguns dias atrasada em relação ao
+       calendário.
+    3. OPORTUNIDADES — quanto falta pra próxima faixa (se existir uma
+       faixa mais alta ainda não alcançada) e quanto isso valeria.
+
+    "Valor Campanha" em qualquer um dos três cenários é a soma, linha a
+    linha, do que cada proposta de produção vale conforme os critérios
+    cadastrados e a faixa (percentual de bônus) que a campanha atingiu:
+      - critério marcado "Não contabilizar" → contrato vale 0;
+      - critério com % especial cadastrado → contrato vale valor × %
+        especial (o % especial sempre manda, independente da faixa);
+      - contrato sem % especial (critério "inclusivo" ou nenhum
+        critério bate) → contrato vale valor × percentual da faixa
+        atingida pela campanha;
+    e fica zerado por completo se a campanha ainda não tiver alcançado nenhuma
+    faixa."""
+    campanhas = listar_campanhas()
+    campanha = next((c for c in campanhas if c["id"] == campanha_id), None)
+    if not campanha:
+        raise ValueError("Campanha não encontrada.")
+
+    di = _para_date(data_inicio) or campanha.get("data_inicio")
+    df = _para_date(data_fim) or campanha.get("data_fim")
+    faixas_metas = campanha.get("faixas_metas") or []
+
+    if not di or not df:
+        return {
+            "producao_atual": 0.0, "valor_campanha_atual": 0.0,
+            "faixa_atingida": 0.0, "meta_atingida": 0.0,
+            "producao_prevista": 0.0, "valor_campanha_previsto": 0.0,
+            "faixa_prevista": 0.0, "meta_prevista_valor": 0.0, "percentual_atingimento_projecao": 0.0,
+            "producao_necessaria_oportunidade": None, "proxima_faixa": None, "proxima_meta": None,
+            "valor_campanha_oportunidade": None, "percentual_atingimento_oportunidade": 0.0,
+            "teto_atingido": False,
+        }
+
+    linhas = _detalhes_producao_campanha(campanha, di, df)
+    criterios_todos = listar_criterios()
+    criterios_da_campanha = [c for c in criterios_todos if c.get("campanha_id") == campanha_id]
+
+    coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
+
+    # 1ª passada: soma a produção total e já resolve, linha a linha, qual
+    # critério bate (isso não muda com a faixa da campanha, então dá pra
+    # calcular uma vez só e reaproveitar na 2ª passada).
+    producao_atual = 0.0
+    datas_com_producao = set()
+    linhas_com_criterio = []
+    for linha in linhas:
+        valor_base = float(linha.get(coluna_valor) or 0)
+        producao_atual += valor_base
+        if linha.get("data_pagamento"):
+            datas_com_producao.add(linha["data_pagamento"])
+        criterio_encontrado = next((c for c in criterios_da_campanha if _criterio_aplica(c, linha)), None)
+        linhas_com_criterio.append((valor_base, criterio_encontrado))
+
+    # A faixa (percentual de bônus) só pode ser conhecida depois de somar
+    # toda a produção do período — por isso o cenário atual precisa da
+    # avaliação de faixas ANTES da 2ª passada, que calcula o valor de
+    # apuração de cada contrato já usando esse percentual.
+    aval_atual = _avaliar_faixas(faixas_metas, producao_atual)
+    faixa_pct_atual = (aval_atual["faixa_atingida"] or 0.0) / 100
+
+    valor_apuracao_atual = 0.0
+    for valor_base, criterio_encontrado in linhas_com_criterio:
+        if criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+            pass  # soma 0
+        elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
+            valor_apuracao_atual += valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
+        else:
+            # Contrato sem % especial cadastrado (critério "inclusivo" ou
+            # nenhum critério bateu): segue a regra geral da campanha —
+            # produção do contrato × percentual da faixa atingida.
+            valor_apuracao_atual += valor_base * faixa_pct_atual
+
+    # ── 1. Cenário atual ─────────────────────────────────────────────
+    valor_campanha_atual = valor_apuracao_atual if aval_atual["tier_atingido"] else 0.0
+
+    # taxa média de apuração (o quanto, na média, cada R$1 de produção
+    # rende depois de aplicar os critérios) — usada pra projetar valor
+    # em cenários futuros/hipotéticos, assumindo que a mesma mistura de
+    # critérios continua valendo.
+    taxa_apuracao = (valor_apuracao_atual / producao_atual) if producao_atual > 0 else 1.0
+
+    # ── 2. Projeção até o fim da campanha ────────────────────────────
+    data_referencia = max(datas_com_producao) if datas_com_producao else di
+    dias_com_producao_qtd = len(datas_com_producao)
+    media_diaria = (producao_atual / dias_com_producao_qtd) if dias_com_producao_qtd > 0 else 0.0
+    dias_uteis_restantes = _dias_uteis_entre(data_referencia + timedelta(days=1), df) if data_referencia < df else 0
+    producao_prevista = producao_atual + (media_diaria * dias_uteis_restantes)
+
+    aval_prevista = _avaliar_faixas(faixas_metas, producao_prevista)
+    valor_campanha_previsto = (producao_prevista * taxa_apuracao) if aval_prevista["tier_atingido"] else 0.0
+
+    # ── 3. Oportunidades (baseado no que já foi produzido, não na projeção) ──
+    # "proxima_meta" é o valor de produção (R$) que falta alcançar; é
+    # contra ela (não contra "proxima_faixa", que é só o percentual de
+    # bônus daquela faixa) que a produção precisa ser comparada.
+    proxima_faixa = aval_atual["proxima_faixa"]
+    proxima_meta = aval_atual["proxima_meta"]
+    producao_necessaria = (proxima_meta - producao_atual) if proxima_meta is not None else None
+    valor_campanha_oportunidade = (proxima_meta * taxa_apuracao) if proxima_meta is not None else None
+
+    return {
+        "producao_atual": round(producao_atual, 2),
+        "valor_campanha_atual": round(valor_campanha_atual, 2),
+        "faixa_atingida": aval_atual["faixa_atingida"],
+        "meta_atingida": round(aval_atual["meta_atingida"], 2),
+
+        "producao_prevista": round(producao_prevista, 2),
+        "valor_campanha_previsto": round(valor_campanha_previsto, 2),
+        "faixa_prevista": aval_prevista["faixa_atingida"],
+        "meta_prevista_valor": round(aval_prevista["meta_atingida"], 2),
+        "percentual_atingimento_projecao": aval_prevista["percentual_atingimento"],
+
+        "producao_necessaria_oportunidade": round(producao_necessaria, 2) if producao_necessaria is not None else None,
+        "proxima_faixa": proxima_faixa,
+        "proxima_meta": proxima_meta,
+        "valor_campanha_oportunidade": round(valor_campanha_oportunidade, 2) if valor_campanha_oportunidade is not None else None,
+        "percentual_atingimento_oportunidade": aval_atual["percentual_atingimento"],
+        "teto_atingido": aval_atual["teto_atingido"],
     }
 
 
 def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None, busca_campanha=None):
     """Lista as campanhas (com filtro opcional de banco/campanha) já
-    calculando, pra cada uma, quanto de produção real bateu no período
-    filtrado — e o que falta pra próxima faixa de bônus."""
+    calculando, pra cada uma, os 3 cenários financeiros (ver
+    calcular_cenarios_campanha)."""
     campanhas = listar_campanhas()
 
     if banco:
@@ -496,21 +680,8 @@ def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None
 
     resultado = []
     for campanha in campanhas:
-        di = data_inicio or campanha.get("data_inicio")
-        df = data_fim or campanha.get("data_fim")
-
-        if not di or not df:
-            producao = 0.0
-        else:
-            producao = _producao_campanha(campanha, di, df)
-
-        avaliacao = _avaliar_faixas(campanha.get("faixas_metas"), producao)
-
-        resultado.append({
-            **campanha,
-            "valor_campanha": producao,
-            **avaliacao,
-        })
+        cenarios = calcular_cenarios_campanha(campanha["id"], data_inicio, data_fim)
+        resultado.append({**campanha, **cenarios})
 
     return resultado
 
@@ -542,14 +713,16 @@ def _criterio_aplica(criterio, linha):
 
 def gerar_relatorio_apuracao(campanha_id):
     """Toda a produção do banco da campanha, no período da campanha —
-    com uma coluna a mais (valor_apuracao) calculada linha a linha:
+    com uma coluna a mais (valor_apuracao) calculada linha a linha, com
+    a mesma regra usada na Visão geral (ver calcular_cenarios_campanha):
       - se algum critério da campanha bater com a linha e estiver
         marcado "Não contabilizar" → valor_apuracao = 0
       - se algum critério bater e tiver % especial definido →
         valor_apuracao = valor da linha (líquido/bruto conforme a
         campanha) * (perc_especial / 100)
       - senão (nenhum critério bate, ou bate sem % especial) →
-        valor_apuracao = valor da linha, sem ajuste."""
+        valor_apuracao = valor da linha * (percentual da faixa que a
+        campanha atingiu no período, com base na produção total)."""
     from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
 
     campanhas = listar_campanhas()
@@ -559,6 +732,7 @@ def gerar_relatorio_apuracao(campanha_id):
 
     criterios_todos = listar_criterios()
     criterios_da_campanha = [c for c in criterios_todos if c.get("campanha_id") == campanha_id]
+    faixas_metas = campanha.get("faixas_metas") or []
 
     coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
 
@@ -582,7 +756,14 @@ def gerar_relatorio_apuracao(campanha_id):
             bigquery.ScalarQueryParameter("data_fim", "DATE", campanha.get("data_fim")),
         ]
     )
-    linhas = client.query(query, job_config=job_config).result()
+    linhas = list(client.query(query, job_config=job_config).result())
+
+    # 1ª passada: soma a produção total do período pra saber qual faixa
+    # (percentual de bônus) a campanha atingiu — precisa disso antes de
+    # calcular o valor_apuracao de cada contrato individualmente.
+    producao_total = sum(float(dict(linha).get(coluna_valor) or 0) for linha in linhas)
+    aval = _avaliar_faixas(faixas_metas, producao_total)
+    faixa_pct = (aval["faixa_atingida"] or 0.0) / 100 if aval["tier_atingido"] else 0.0
 
     resultado = []
     for linha in linhas:
@@ -596,7 +777,7 @@ def gerar_relatorio_apuracao(campanha_id):
         elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
             valor_apuracao = valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
         else:
-            valor_apuracao = valor_base
+            valor_apuracao = valor_base * faixa_pct
 
         linha_dict["valor_apuracao"] = round(valor_apuracao, 2)
         resultado.append(linha_dict)
