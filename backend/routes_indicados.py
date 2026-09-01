@@ -3,7 +3,7 @@ import io
 from flask import Blueprint, request, jsonify, send_file
 
 from routes_auth import login_required, requer_papel
-from lib.indicados import listar_indicados, adicionar_indicado, excluir_indicado
+from lib.indicados import listar_indicados, adicionar_indicado, editar_indicado, excluir_indicado
 from lib.bancos_config import opcoes_banco_distintos
 from lib.dashboard import (
     detalhamento_indicados,
@@ -116,6 +116,21 @@ def indicados_adicionar():
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "erro": str(exc)}), 500
 
+    return jsonify({"ok": True})
+
+
+@bp_indicados.route("/indicados/<id_>", methods=["PUT"])
+@requer_papel(["admin", "editor"])
+def indicados_editar(id_):
+    """Edita Nome e Usuário de um indicado já cadastrado. Cód. Loja não é
+    editável por aqui (é a chave usada no cruzamento de dados)."""
+    dados = request.get_json(silent=True) or {}
+    try:
+        editar_indicado(id_, dados.get("nome"), dados.get("usuario"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "erro": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "erro": str(exc)}), 500
     return jsonify({"ok": True})
 
 

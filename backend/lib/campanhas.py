@@ -60,14 +60,24 @@ SCHEMA_CAMPANHAS = [
 # Critérios
 # ─────────────────────────────────────────────────────────────────────────
 CAMPOS_CRITERIO = [
-    "campanha_id", "banco", "campanha", "convenio", "produto", "valor_base",
+    "campanha_id", "banco", "campanha", "convenio", "produto", "base_producao_criterio",
     "tabela", "descr_tabela", "prazo_min", "prazo_max", "valor_min", "valor_max",
     "data_inicio", "data_fim", "status", "perc_especial",
 ]
-# "valor_base" NÃO é mais um número digitado — é a escolha de qual coluna
-# da base consolidada esse critério considera como produção: "liquido"
-# (vlr_liquido) ou "bruto" (vlr_bruto). Por isso saiu da lista de campos
-# numéricos.
+# "base_producao_criterio" é a escolha de qual coluna da base consolidada
+# esse critério considera como produção: "liquido" (vlr_liquido) ou
+# "bruto" (vlr_bruto) — NUNCA foi um número digitado. O nome do campo é
+# esse (e não "valor_base", como em versões antigas do código) porque a
+# tabela real no BigQuery já tinha uma coluna "valor_base" do tipo
+# FLOAT64 de um design anterior (quando esse campo era mesmo numérico) —
+# e como _migrar_schema_generico só ADICIONA coluna nova, nunca muda o
+# tipo de uma já existente, gravar uma string ali quebrava com "Could
+# not convert 'liquido' ... tried to convert to double". Usar um nome de
+# coluna novo evita esse conflito de tipo sem precisar de nenhuma
+# migração manual na tabela.
+# "base_producao_criterio" nunca foi um número digitado — sempre foi a
+# escolha de qual coluna da base consolidada esse critério considera
+# como produção ("liquido"/vlr_liquido ou "bruto"/vlr_bruto).
 CAMPOS_CRITERIO_NUMERO = ["prazo_min", "prazo_max", "valor_min", "valor_max", "perc_especial"]
 CAMPOS_CRITERIO_DATA = ["data_inicio", "data_fim"]
 
@@ -78,7 +88,7 @@ SCHEMA_CRITERIOS = [
     bigquery.SchemaField("campanha", "STRING"),
     bigquery.SchemaField("convenio", "STRING"),
     bigquery.SchemaField("produto", "STRING"),
-    bigquery.SchemaField("valor_base", "STRING"),
+    bigquery.SchemaField("base_producao_criterio", "STRING"),
     bigquery.SchemaField("tabela", "STRING"),
     bigquery.SchemaField("descr_tabela", "STRING"),
     bigquery.SchemaField("prazo_min", "FLOAT64"),
@@ -416,11 +426,11 @@ def salvar_criterio(dados, criado_por, id_existente=None):
 
     linha = _preparar_linha(dados, CAMPOS_CRITERIO, CAMPOS_CRITERIO_NUMERO, CAMPOS_CRITERIO_DATA)
 
-    if linha.get("valor_base") not in BASE_PRODUCAO_VALIDOS:
+    if linha.get("base_producao_criterio") not in BASE_PRODUCAO_VALIDOS:
         # Se o critério não escolheu explicitamente, herda o padrão da
         # campanha (e se nem a campanha tiver, cai no padrão geral).
         campanha_relacionada = next((c for c in listar_campanhas() if c["id"] == campanha_id), None)
-        linha["valor_base"] = (campanha_relacionada or {}).get("base_producao") or BASE_PRODUCAO_PADRAO
+        linha["base_producao_criterio"] = (campanha_relacionada or {}).get("base_producao") or BASE_PRODUCAO_PADRAO
 
     linha.update({"id": id_final, "criado_em": datetime.utcnow(), "criado_por": criado_por})
 

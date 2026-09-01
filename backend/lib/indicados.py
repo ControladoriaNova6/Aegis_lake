@@ -125,6 +125,47 @@ def excluir_indicado(id_):
     invalidar_tudo()
 
 
+def editar_indicado(id_, nome, usuario):
+    """Edita um indicado já existente — só Nome e Usuário podem mudar.
+    Cód. Loja é a chave usada no cruzamento de dados (Manutenção) e em
+    qualquer importação já feita com base nele, então não é editável
+    por aqui (trocar o código quebraria esse vínculo silenciosamente).
+    Mesmo padrão upsert do resto do sistema: apaga a linha antiga e
+    grava uma nova com os mesmos id/criado_em/banco/cod_loja."""
+    garantir_tabela_indicados()
+    indicados = listar_indicados()
+    alvo = next((i for i in indicados if i["id"] == id_), None)
+    if not alvo:
+        raise ValueError("Indicado não encontrado.")
+
+    novo_nome = (nome or "").strip() or None
+    novo_usuario = (usuario or "").strip()
+    if not novo_usuario:
+        raise ValueError("Informe o usuário.")
+    if not alvo.get("cod_loja") and not novo_nome:
+        raise ValueError("Preencha Cód. Loja ou Nome.")
+
+    client = get_bigquery_client()
+    table_id = f"{PROJECT}.{DATASET}.{TABELA_INDICADOS}"
+
+    excluir_indicado(id_)
+
+    linha = pd.DataFrame([{
+        "id": alvo["id"],
+        "criado_em": alvo.get("criado_em") or datetime.utcnow(),
+        "banco": alvo["banco"],
+        "cod_loja": alvo.get("cod_loja"),
+        "nome": novo_nome,
+        "usuario": novo_usuario,
+    }])
+
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    job = client.load_table_from_dataframe(linha, table_id, job_config=job_config)
+    job.result()
+
+    invalidar_tudo()
+
+
 def carregar_todos_indicados():
     """Usado pelo importador (lib/importador.py) para fazer o lookup
     cod_indicado durante uma importação de produção."""

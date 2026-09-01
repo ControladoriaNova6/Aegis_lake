@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
-import { Users, Plus, Trash, Refresh, Download } from "../components/icons";
+import { Users, Plus, Trash, Refresh, Download, Settings } from "../components/icons";
 import { brl, mesBr, mesAtual } from "../utils/format";
 
 async function buscarIndicados(busca) {
@@ -37,6 +37,8 @@ export default function Indicados() {
   const [busca, setBusca] = useState("");
   const [buscaAtiva, setBuscaAtiva] = useState("");
   const [mensagem, setMensagem] = useState(null);
+  const [editandoId, setEditandoId] = useState(null);
+  const [edicao, setEdicao] = useState({ nome: "", usuario: "" });
 
   const atual = mesAtual();
   const [filtroDetBanco, setFiltroDetBanco] = useState("");
@@ -111,6 +113,30 @@ export default function Indicados() {
     },
     onError: (err) => setMensagem({ ok: false, texto: err?.response?.data?.erro || err.message }),
   });
+
+  const editarMutation = useMutation({
+    mutationFn: ({ id, dados }) => api.put(`/indicados/${id}`, dados),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["indicados"] });
+      setMensagem({ ok: true, texto: "Indicado atualizado." });
+      setEditandoId(null);
+    },
+    onError: (err) => setMensagem({ ok: false, texto: err?.response?.data?.erro || err.message }),
+  });
+
+  function abrirEdicao(i) {
+    setEditandoId(i.id);
+    setEdicao({ nome: i.nome || "", usuario: i.usuario || "" });
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setEdicao({ nome: "", usuario: "" });
+  }
+
+  function salvarEdicao(id) {
+    editarMutation.mutate({ id, dados: edicao });
+  }
 
   function handleAdicionar(e) {
     e.preventDefault();
@@ -208,17 +234,62 @@ export default function Indicados() {
               {indicados.length === 0 && (
                 <tr><td colSpan={5} className="muted center">Nenhum indicado encontrado.</td></tr>
               )}
-              {indicados.map((i) => (
-                <tr key={i.id}>
-                  <td className="small">{i.banco}</td>
-                  <td className="mono small">{i.cod_loja || "—"}</td>
-                  <td className="small">{i.nome || "—"}</td>
-                  <td className="small">{i.usuario}</td>
-                  <td>
-                    <button className="btn-danger" onClick={() => excluirMutation.mutate(i.id)}><Trash /></button>
-                  </td>
-                </tr>
-              ))}
+              {indicados.map((i) => {
+                const editando = editandoId === i.id;
+                return (
+                  <tr key={i.id}>
+                    <td className="small">{i.banco}</td>
+                    <td className="mono small">{i.cod_loja || "—"}</td>
+                    <td className="small">
+                      {editando ? (
+                        <input
+                          type="text"
+                          value={edicao.nome}
+                          onChange={(e) => setEdicao((f) => ({ ...f, nome: e.target.value }))}
+                          style={{ width: "100%" }}
+                        />
+                      ) : (
+                        i.nome || "—"
+                      )}
+                    </td>
+                    <td className="small">
+                      {editando ? (
+                        <input
+                          type="text"
+                          value={edicao.usuario}
+                          onChange={(e) => setEdicao((f) => ({ ...f, usuario: e.target.value }))}
+                          style={{ width: "100%" }}
+                        />
+                      ) : (
+                        i.usuario
+                      )}
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {editando ? (
+                        <>
+                          <button
+                            className="btn-link"
+                            onClick={() => salvarEdicao(i.id)}
+                            disabled={editarMutation.isPending}
+                            title="Salvar"
+                            style={{ marginRight: "0.4rem" }}
+                          >
+                            {editarMutation.isPending ? "Salvando…" : "Salvar"}
+                          </button>
+                          <button className="btn-link" onClick={cancelarEdicao} title="Cancelar">Cancelar</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn-link" onClick={() => abrirEdicao(i)} title="Editar Nome/Usuário" style={{ marginRight: "0.4rem" }}>
+                            <Settings />
+                          </button>
+                          <button className="btn-danger" onClick={() => excluirMutation.mutate(i.id)} title="Excluir"><Trash /></button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

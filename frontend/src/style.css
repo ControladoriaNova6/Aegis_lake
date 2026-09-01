@@ -166,11 +166,6 @@ body {
   display: grid;
   grid-template-columns: 216px 1fr;
   min-height: 100vh;
-  transition: grid-template-columns 0.15s ease;
-}
-
-.app-shell.sidebar-minimizada {
-  grid-template-columns: 64px 1fr;
 }
 
 .sidebar {
@@ -180,15 +175,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2rem;
-  overflow: hidden;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: center;
+  gap: 0.65rem;
   padding: 0.25rem 0.25rem 0.75rem;
-  position: relative;
 }
 
 .brand-mark {
@@ -207,8 +201,8 @@ body {
 }
 
 .brand-mark-img {
-  width: 36px;
-  height: 36px;
+  width: 51px;
+  height: 51px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -225,46 +219,6 @@ body {
 
 .brand-name-accent {
   color: var(--primary);
-}
-
-.sidebar-toggle {
-  margin-left: auto;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted-foreground);
-  border-radius: 6px;
-  width: 22px;
-  height: 22px;
-  line-height: 1;
-  font-size: 0.75rem;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.sidebar-toggle:hover {
-  color: var(--foreground);
-  border-color: var(--border-strong);
-}
-
-.sidebar-minimizada .brand {
-  justify-content: center;
-}
-
-.sidebar-minimizada .brand-name,
-.sidebar-minimizada .nav-label {
-  display: none;
-}
-
-.sidebar-minimizada .sidebar-toggle {
-  margin-left: 0;
-  position: absolute;
-  right: -10px;
-  top: 0;
-}
-
-.sidebar-minimizada .sidenav a,
-.sidebar-minimizada .nav-group summary {
-  justify-content: center;
 }
 
 .sidenav {

@@ -9,7 +9,7 @@ import { Settings, Plus, Trash } from "../components/icons";
 import { percentual } from "../utils/format";
 
 const FORM_VAZIO = {
-  convenio: "", produto: "", valor_base: "liquido", tabela: "", descr_tabela: "",
+  convenio: "", produto: "", base_producao_criterio: "liquido", tabela: "", descr_tabela: "",
   prazo_min: "", prazo_max: "", valor_min: "", valor_max: "", data_inicio: "", data_fim: "",
   status: "ativo", perc_especial: "",
 };
@@ -95,7 +95,7 @@ export default function CampanhasCriterios() {
   function abrirNovoCriterio(campanha) {
     setModalCampanha(campanha);
     setEditandoCriterioId(null);
-    setForm({ ...FORM_VAZIO, valor_base: campanha.base_producao || "liquido" });
+    setForm({ ...FORM_VAZIO, base_producao_criterio: campanha.base_producao || "liquido" });
     setMensagem(null);
   }
 
@@ -104,8 +104,8 @@ export default function CampanhasCriterios() {
     setEditandoCriterioId(criterio.id);
     const novo = { ...FORM_VAZIO };
     Object.keys(FORM_VAZIO).forEach((campo) => {
-      if (campo === "valor_base") {
-        novo[campo] = criterio.valor_base || campanha.base_producao || "liquido";
+      if (campo === "base_producao_criterio") {
+        novo[campo] = criterio.base_producao_criterio || campanha.base_producao || "liquido";
         return;
       }
       novo[campo] = criterio[campo] ?? (campo === "status" ? "ativo" : "");
@@ -209,7 +209,6 @@ export default function CampanhasCriterios() {
               )}
               {campanhasFiltradas.map((c) => {
                 const criteriosDela = criteriosDaCampanha(c.id);
-                const trava = bloqueado(c.status);
                 return (
                   <tr key={c.id}>
                     <td className="small">{c.banco}</td>
@@ -222,11 +221,10 @@ export default function CampanhasCriterios() {
                     <td>
                       <button
                         className="btn-link"
-                        disabled={trava}
-                        title={trava ? `Não é possível editar critérios de campanha ${c.status}` : "Cadastrar critério"}
+                        title="Ver e cadastrar critérios dessa campanha"
                         onClick={() => abrirNovoCriterio(c)}
                       >
-                        <Plus /> Cadastrar critério
+                        {criteriosDela.length > 0 ? <><Settings /> Ver / editar critérios</> : <><Plus /> Cadastrar critério</>}
                       </button>
                     </td>
                   </tr>
@@ -242,6 +240,14 @@ export default function CampanhasCriterios() {
             <p className="section-title" style={{ marginTop: 0 }}>
               {editandoCriterioId ? "Editar" : "Novo"} critério — {modalCampanha.campanha}
             </p>
+
+            {bloqueado(modalCampanha.status) && (
+              <p className="muted small" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
+                Campanha "{modalCampanha.status}" — não é possível criar, editar ou excluir critérios enquanto ela
+                estiver nesse status (mude o status na tela de Cadastro se precisar mexer). Dá pra consultar os já
+                cadastrados normalmente.
+              </p>
+            )}
 
             <form onSubmit={handleSalvar}>
               <table className="form-table">
@@ -277,7 +283,7 @@ export default function CampanhasCriterios() {
                   <tr>
                     <td className="form-table-label">Valor base</td>
                     <td>
-                      <select value={form.valor_base} onChange={(e) => handleChange("valor_base", e.target.value)}>
+                      <select value={form.base_producao_criterio} onChange={(e) => handleChange("base_producao_criterio", e.target.value)}>
                         <option value="liquido">Líquido (vlr_liquido)</option>
                         <option value="bruto">Bruto (vlr_bruto)</option>
                       </select>
@@ -354,7 +360,7 @@ export default function CampanhasCriterios() {
               </table>
 
               <div className="filter-actions" style={{ marginTop: "1rem" }}>
-                <button type="submit" disabled={salvarMutation.isPending}>
+                <button type="submit" disabled={salvarMutation.isPending || bloqueado(modalCampanha.status)}>
                   {salvarMutation.isPending ? "Salvando…" : "Salvar"}
                 </button>
                 <button type="button" className="btn-link" onClick={fecharModal}>Cancelar</button>
@@ -373,13 +379,13 @@ export default function CampanhasCriterios() {
                           <td className="small">{crit.convenio}</td>
                           <td className="small">{crit.produto}</td>
                           <td className="mono small">{crit.tabela}</td>
-                          <td className="small">{crit.valor_base === "bruto" ? "Bruto" : "Líquido"}</td>
+                          <td className="small">{crit.base_producao_criterio === "bruto" ? "Bruto" : "Líquido"}</td>
                           <td className="mono small">{percentual(crit.perc_especial)}</td>
                           <td style={{ whiteSpace: "nowrap" }}>
-                            <button className="btn-link" onClick={() => abrirEditarCriterio(modalCampanha, crit)} style={{ marginRight: "0.4rem" }}>
+                            <button className="btn-link" onClick={() => abrirEditarCriterio(modalCampanha, crit)} disabled={bloqueado(modalCampanha.status)} style={{ marginRight: "0.4rem" }}>
                               <Settings />
                             </button>
-                            <button className="btn-danger" onClick={() => handleExcluirCriterio(crit.id)}>
+                            <button className="btn-danger" onClick={() => handleExcluirCriterio(crit.id)} disabled={bloqueado(modalCampanha.status)}>
                               <Trash />
                             </button>
                           </td>
