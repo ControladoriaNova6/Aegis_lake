@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 
-from routes_auth import login_required
+from routes_auth import login_required, requer_papel
 from lib.dashboard import (
     listar_meses_disponiveis,
     resumo_por_dia,
@@ -14,7 +14,7 @@ bp_dashboard = Blueprint("dashboard", __name__, url_prefix="/api")
 
 
 @bp_dashboard.route("/dashboard")
-@login_required
+@requer_papel(["admin", "editor", "visualizador"])
 def dashboard():
     banco = request.args.get("banco") or None
     mes_inicio = request.args.get("mes_inicio") or mes_atual()

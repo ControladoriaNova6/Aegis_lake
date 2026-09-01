@@ -7,7 +7,7 @@ bp_logs = Blueprint("logs", __name__, url_prefix="/api")
 
 
 @bp_logs.route("/logs")
-@login_required
+@requer_papel(["admin", "editor"])
 def logs_listar():
     busca = request.args.get("q") or None
     try:

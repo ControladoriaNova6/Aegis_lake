@@ -16,7 +16,7 @@ bp_parametros = Blueprint("parametros", __name__, url_prefix="/api")
 
 
 @bp_parametros.route("/parametros")
-@login_required
+@requer_papel(["admin", "editor"])
 def parametros_listar():
     try:
         grid = montar_grid_mapeamento()

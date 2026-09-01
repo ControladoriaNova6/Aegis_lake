@@ -60,7 +60,7 @@ SCHEMA_CAMPANHAS = [
 # Critérios
 # ─────────────────────────────────────────────────────────────────────────
 CAMPOS_CRITERIO = [
-    "campanha_id", "banco", "campanha", "prod_cod", "convenio", "produto", "valor_base",
+    "campanha_id", "banco", "campanha", "convenio", "produto", "valor_base",
     "tabela", "descr_tabela", "prazo_min", "prazo_max", "valor_min", "valor_max",
     "data_inicio", "data_fim", "status", "perc_especial",
 ]
@@ -76,7 +76,6 @@ SCHEMA_CRITERIOS = [
     bigquery.SchemaField("campanha_id", "STRING"),
     bigquery.SchemaField("banco", "STRING"),
     bigquery.SchemaField("campanha", "STRING"),
-    bigquery.SchemaField("prod_cod", "STRING"),
     bigquery.SchemaField("convenio", "STRING"),
     bigquery.SchemaField("produto", "STRING"),
     bigquery.SchemaField("valor_base", "STRING"),
@@ -296,6 +295,42 @@ def excluir_campanha(id_):
     invalidar_tudo()
 
 
+def renovar_campanha(id_, nova_data_inicio, nova_data_fim, criado_por):
+    """Renova uma campanha: cria uma campanha NOVA (nova linha, novo id),
+    copiando banco/nome/faixas-metas/filtros da campanha original, mas
+    com o novo período de apuração informado — e também copia (clona)
+    todos os critérios já cadastrados na campanha original para essa
+    campanha nova, já que uma renovação normalmente segue as mesmas
+    regras de apuração de antes. A campanha original não é alterada."""
+    campanhas = listar_campanhas()
+    original = next((c for c in campanhas if c["id"] == id_), None)
+    if not original:
+        raise ValueError("Campanha não encontrada.")
+
+    novo_di = _para_date(nova_data_inicio)
+    novo_df = _para_date(nova_data_fim)
+    if not novo_di or not novo_df or novo_di > novo_df:
+        raise ValueError("Período da nova campanha inválido: data de início precisa ser anterior ou igual à data de fim.")
+
+    dados_nova_campanha = {campo: original.get(campo) for campo in CAMPOS_CAMPANHA}
+    dados_nova_campanha["data_inicio"] = novo_di
+    dados_nova_campanha["data_fim"] = novo_df
+    dados_nova_campanha["status"] = STATUS_CAMPANHA_PADRAO
+    dados_nova_campanha["faixas_metas"] = original.get("faixas_metas") or []
+    for campo in CAMPOS_FILTRO_PRODUCAO:
+        dados_nova_campanha[campo] = original.get(campo) or []
+
+    novo_id = salvar_campanha(dados_nova_campanha, criado_por=criado_por)
+
+    criterios_originais = [c for c in listar_criterios() if c.get("campanha_id") == id_]
+    for criterio in criterios_originais:
+        dados_criterio = {campo: criterio.get(campo) for campo in CAMPOS_CRITERIO}
+        dados_criterio["campanha_id"] = novo_id
+        salvar_criterio(dados_criterio, criado_por=criado_por)
+
+    return novo_id
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # API pública: critérios
 # ─────────────────────────────────────────────────────────────────────────
@@ -452,7 +487,10 @@ def _detalhes_producao_campanha(campanha, data_inicio, data_fim):
 
     where_sql = " AND ".join(condicoes)
     query = f"""
-        SELECT {DATE_COLUMN} AS data_pagamento, convenio, produto, cod_tabela, tabela, vlr_liquido, vlr_bruto
+        SELECT
+            {DATE_COLUMN} AS data_pagamento,
+            convenio, produto, map_convenio, map_produto,
+            cod_tabela, tabela, vlr_liquido, vlr_bruto
         FROM {tabela}
         WHERE {where_sql}
     """
@@ -563,11 +601,21 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
     if not campanha:
         raise ValueError("Campanha não encontrada.")
 
-    di = _para_date(data_inicio) or campanha.get("data_inicio")
-    df = _para_date(data_fim) or campanha.get("data_fim")
+    di_campanha = _para_date(campanha.get("data_inicio"))
+    df_campanha = _para_date(campanha.get("data_fim"))
+    di_filtro = _para_date(data_inicio)
+    df_filtro = _para_date(data_fim)
+
+    # O filtro de data da tela (quando informado) precisa ser
+    # INTERSECCIONADO com o período de apuração de cada campanha, nunca
+    # substituí-lo — senão todas as campanhas acabam usando a mesma
+    # janela de datas (a do filtro), ignorando o período configurado em
+    # cada uma e retornando a mesma produção pra campanhas diferentes.
+    di = max(di_campanha, di_filtro) if (di_campanha and di_filtro) else (di_campanha or di_filtro)
+    df = min(df_campanha, df_filtro) if (df_campanha and df_filtro) else (df_campanha or df_filtro)
     faixas_metas = campanha.get("faixas_metas") or []
 
-    if not di or not df:
+    if not di or not df or di > df:
         return {
             "producao_atual": 0.0, "valor_campanha_atual": 0.0,
             "faixa_atingida": 0.0, "meta_atingida": 0.0,
@@ -606,16 +654,21 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
     faixa_pct_atual = (aval_atual["faixa_atingida"] or 0.0) / 100
 
     valor_apuracao_atual = 0.0
-    for valor_base, criterio_encontrado in linhas_com_criterio:
-        if criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
-            pass  # soma 0
-        elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
-            valor_apuracao_atual += valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
-        else:
-            # Contrato sem % especial cadastrado (critério "inclusivo" ou
-            # nenhum critério bateu): segue a regra geral da campanha —
-            # produção do contrato × percentual da faixa atingida.
-            valor_apuracao_atual += valor_base * faixa_pct_atual
+    if criterios_da_campanha:
+        for valor_base, criterio_encontrado in linhas_com_criterio:
+            if criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+                pass  # soma 0
+            elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
+                valor_apuracao_atual += valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
+            else:
+                # Contrato sem % especial cadastrado (critério "inclusivo" ou
+                # nenhum critério bateu): segue a regra geral da campanha —
+                # produção do contrato × percentual da faixa atingida.
+                valor_apuracao_atual += valor_base * faixa_pct_atual
+    # Sem nenhum critério cadastrado pra campanha, não existe recebimento
+    # possível — a produção pode até bater a meta, mas não há regra
+    # nenhuma dizendo quanto pagar por ela, então valor_apuracao_atual
+    # (e tudo que deriva dele: projeção e oportunidade) fica zerado.
 
     # ── 1. Cenário atual ─────────────────────────────────────────────
     valor_campanha_atual = valor_apuracao_atual if aval_atual["tier_atingido"] else 0.0
@@ -627,10 +680,17 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
     taxa_apuracao = (valor_apuracao_atual / producao_atual) if producao_atual > 0 else 1.0
 
     # ── 2. Projeção até o fim da campanha ────────────────────────────
+    # A projeção sempre mira o fim REAL da campanha (df_campanha), não o
+    # fim do filtro de data da tela — senão, com o filtro padrão da tela
+    # (normalmente "mês atual"), a projeção ficava artificialmente
+    # cortada no fim do mês em vez de ir até o fim de verdade da
+    # campanha, fazendo campanhas com fins diferentes parecerem com
+    # projeções parecidas demais.
+    df_projecao = df_campanha or df
     data_referencia = max(datas_com_producao) if datas_com_producao else di
     dias_com_producao_qtd = len(datas_com_producao)
     media_diaria = (producao_atual / dias_com_producao_qtd) if dias_com_producao_qtd > 0 else 0.0
-    dias_uteis_restantes = _dias_uteis_entre(data_referencia + timedelta(days=1), df) if data_referencia < df else 0
+    dias_uteis_restantes = _dias_uteis_entre(data_referencia + timedelta(days=1), df_projecao) if data_referencia < df_projecao else 0
     producao_prevista = producao_atual + (media_diaria * dias_uteis_restantes)
 
     aval_prevista = _avaliar_faixas(faixas_metas, producao_prevista)
@@ -697,12 +757,22 @@ def _criterio_aplica(criterio, linha):
     """Um critério "aplica" numa linha de produção se convênio e produto
     baterem (quando o critério define esses campos) — e, se o critério
     também tiver uma tabela definida, ela precisa bater com a tabela/
-    código de tabela da linha."""
+    código de tabela da linha.
+
+    Convênio e Produto do critério vêm das colunas TRATADAS (map_convenio/
+    map_produto — ver Manutenção → Cruzar dados), não da coluna bruta da
+    base consolidada, já que são essas que aparecem nas listas de seleção
+    de Convênio/Produto no cadastro do critério. Por isso a comparação
+    usa map_convenio/map_produto da linha, caindo pro valor bruto
+    (convenio/produto) só enquanto essas colunas tratadas ainda não
+    estiverem populadas pra aquela linha."""
     if criterio.get("convenio"):
-        if (linha.get("convenio") or "").strip().upper() != (criterio["convenio"] or "").strip().upper():
+        convenio_linha = linha.get("map_convenio") or linha.get("convenio")
+        if (convenio_linha or "").strip().upper() != (criterio["convenio"] or "").strip().upper():
             return False
     if criterio.get("produto"):
-        if (linha.get("produto") or "").strip().upper() != (criterio["produto"] or "").strip().upper():
+        produto_linha = linha.get("map_produto") or linha.get("produto")
+        if (produto_linha or "").strip().upper() != (criterio["produto"] or "").strip().upper():
             return False
     if criterio.get("tabela"):
         tabela_linha = str(linha.get("cod_tabela") or linha.get("tabela") or "").strip()
@@ -724,6 +794,9 @@ def gerar_relatorio_apuracao(campanha_id):
         valor_apuracao = valor da linha * (percentual da faixa que a
         campanha atingiu no período, com base na produção total)."""
     from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
+    from lib.manutencao import garantir_colunas_map
+
+    garantir_colunas_map()
 
     campanhas = listar_campanhas()
     campanha = next((c for c in campanhas if c["id"] == campanha_id), None)
@@ -740,8 +813,8 @@ def gerar_relatorio_apuracao(campanha_id):
     tabela = f"`{P_DASH}.{D_DASH}.{TABELA_PRINCIPAL}`"
 
     colunas = [
-        "data_pagamento", "ade", "banco", "convenio", "produto", "cod_tabela", "tabela",
-        "vlr_liquido", "vlr_bruto", "usuario", "cod_corretor", "cod_master", "cod_indicado",
+        "data_pagamento", "ade", "banco", "convenio", "produto", "map_convenio", "map_produto",
+        "cod_tabela", "tabela", "vlr_liquido", "vlr_bruto", "usuario", "cod_corretor", "cod_master", "cod_indicado",
     ]
     query = f"""
         SELECT {", ".join(colunas)}
@@ -764,6 +837,8 @@ def gerar_relatorio_apuracao(campanha_id):
     producao_total = sum(float(dict(linha).get(coluna_valor) or 0) for linha in linhas)
     aval = _avaliar_faixas(faixas_metas, producao_total)
     faixa_pct = (aval["faixa_atingida"] or 0.0) / 100 if aval["tier_atingido"] else 0.0
+    # Sem critério nenhum cadastrado pra campanha, não há recebimento.
+    sem_criterios = len(criterios_da_campanha) == 0
 
     resultado = []
     for linha in linhas:
@@ -772,7 +847,9 @@ def gerar_relatorio_apuracao(campanha_id):
 
         criterio_encontrado = next((c for c in criterios_da_campanha if _criterio_aplica(c, linha_dict)), None)
 
-        if criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+        if sem_criterios:
+            valor_apuracao = 0.0
+        elif criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
             valor_apuracao = 0.0
         elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
             valor_apuracao = valor_base * (float(criterio_encontrado["perc_especial"]) / 100)

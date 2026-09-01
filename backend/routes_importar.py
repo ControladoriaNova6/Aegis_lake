@@ -8,7 +8,7 @@ bp_importar = Blueprint("importar", __name__, url_prefix="/api")
 
 
 @bp_importar.route("/configs")
-@login_required
+@requer_papel(["admin", "editor"])
 def configs():
     try:
         opcoes = opcoes_config()

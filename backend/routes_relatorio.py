@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 from flask import Blueprint, request, jsonify, send_file
 
-from routes_auth import login_required
+from routes_auth import login_required, requer_papel
 from lib.relatorio import limites_do_intervalo, contar_relatorio, gerar_relatorio_df, COLUNAS_DATA
 from lib.dashboard import listar_meses_disponiveis, mes_atual
 
@@ -22,7 +22,7 @@ def _params_do_request(args):
 
 
 @bp_relatorio.route("/relatorio/meses")
-@login_required
+@requer_papel(["admin", "editor"])
 def relatorio_meses():
     try:
         meses = listar_meses_disponiveis()
@@ -32,7 +32,7 @@ def relatorio_meses():
 
 
 @bp_relatorio.route("/relatorio/contagem")
-@login_required
+@requer_papel(["admin", "editor"])
 def relatorio_contagem():
     banco, data_inicio, data_fim, cod_master, cod_indicado, mes_inicio, mes_fim = _params_do_request(request.args)
     try:
@@ -43,7 +43,7 @@ def relatorio_contagem():
 
 
 @bp_relatorio.route("/relatorio/download")
-@login_required
+@requer_papel(["admin", "editor"])
 def relatorio_download():
     banco, data_inicio, data_fim, cod_master, cod_indicado, _, _ = _params_do_request(request.args)
 

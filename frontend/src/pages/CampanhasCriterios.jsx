@@ -9,7 +9,7 @@ import { Settings, Plus, Trash } from "../components/icons";
 import { percentual } from "../utils/format";
 
 const FORM_VAZIO = {
-  prod_cod: "", convenio: "", produto: "", valor_base: "liquido", tabela: "", descr_tabela: "",
+  convenio: "", produto: "", valor_base: "liquido", tabela: "", descr_tabela: "",
   prazo_min: "", prazo_max: "", valor_min: "", valor_max: "", data_inicio: "", data_fim: "",
   status: "ativo", perc_especial: "",
 };
@@ -26,6 +26,10 @@ async function buscarCriterios() {
 }
 async function buscarBancos() {
   const { data } = await api.get("/bancos");
+  return data;
+}
+async function buscarValoresMapeados() {
+  const { data } = await api.get("/manutencao/valores-mapeados");
   return data;
 }
 
@@ -46,6 +50,9 @@ export default function CampanhasCriterios() {
   const { data: campanhas = [], isLoading, isError, error } = useQuery({ queryKey: ["campanhas"], queryFn: buscarCampanhas });
   const { data: criterios = [] } = useQuery({ queryKey: ["criterios"], queryFn: buscarCriterios });
   const { data: bancos = [] } = useQuery({ queryKey: ["bancos"], queryFn: buscarBancos });
+  const { data: valoresMapeados = {} } = useQuery({ queryKey: ["valores-mapeados"], queryFn: buscarValoresMapeados });
+  const opcoesConvenio = valoresMapeados.map_convenio || [];
+  const opcoesProduto = valoresMapeados.map_produto || [];
 
   const campanhasFiltradas = campanhas.filter((c) => {
     if (filtroBanco && c.banco !== filtroBanco) return false;
@@ -240,16 +247,32 @@ export default function CampanhasCriterios() {
               <table className="form-table">
                 <tbody>
                   <tr>
-                    <td className="form-table-label">Cód. produto</td>
-                    <td><input type="text" value={form.prod_cod} onChange={(e) => handleChange("prod_cod", e.target.value)} /></td>
-                  </tr>
-                  <tr>
                     <td className="form-table-label">Convênio</td>
-                    <td><input type="text" value={form.convenio} onChange={(e) => handleChange("convenio", e.target.value)} /></td>
+                    <td>
+                      <select value={form.convenio} onChange={(e) => handleChange("convenio", e.target.value)}>
+                        <option value="">Todos</option>
+                        {opcoesConvenio.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                      {opcoesConvenio.length === 0 && (
+                        <span className="muted small" style={{ display: "block", marginTop: "0.25rem" }}>
+                          Nenhum valor de Map Convênio disponível ainda (Manutenção → Cruzar dados). Por ora, "Todos" considera toda a produção.
+                        </span>
+                      )}
+                    </td>
                   </tr>
                   <tr>
                     <td className="form-table-label">Produto</td>
-                    <td><input type="text" value={form.produto} onChange={(e) => handleChange("produto", e.target.value)} /></td>
+                    <td>
+                      <select value={form.produto} onChange={(e) => handleChange("produto", e.target.value)}>
+                        <option value="">Todos</option>
+                        {opcoesProduto.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                      {opcoesProduto.length === 0 && (
+                        <span className="muted small" style={{ display: "block", marginTop: "0.25rem" }}>
+                          Nenhum valor de Map Produto disponível ainda (Manutenção → Cruzar dados). Por ora, "Todos" considera toda a produção.
+                        </span>
+                      )}
+                    </td>
                   </tr>
                   <tr>
                     <td className="form-table-label">Valor base</td>

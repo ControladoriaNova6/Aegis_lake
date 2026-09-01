@@ -17,7 +17,7 @@ bp_indicados = Blueprint("indicados", __name__, url_prefix="/api")
 
 
 @bp_indicados.route("/indicados")
-@login_required
+@requer_papel(["admin", "editor"])
 def indicados_listar():
     busca = request.args.get("q") or None
     try:
@@ -27,7 +27,7 @@ def indicados_listar():
 
 
 @bp_indicados.route("/indicados/detalhamento")
-@login_required
+@requer_papel(["admin", "editor"])
 def indicados_detalhamento():
     """Banco > Indicado > Convênio > Produto (hierárquico, com subtotal em
     cada nível) — só produção de indicados já cadastrados. Usado na tela
@@ -46,7 +46,7 @@ def indicados_detalhamento():
 
 
 @bp_indicados.route("/indicados/detalhamento/download")
-@login_required
+@requer_papel(["admin", "editor"])
 def indicados_detalhamento_download():
     """Mesma consulta do detalhamento, em .xlsx pra baixar."""
     import pandas as pd
@@ -89,7 +89,7 @@ def indicados_detalhamento_download():
 
 
 @bp_indicados.route("/indicados/meses")
-@login_required
+@requer_papel(["admin", "editor"])
 def indicados_meses():
     try:
         return jsonify(listar_meses_disponiveis())

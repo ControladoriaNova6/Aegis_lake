@@ -187,6 +187,69 @@ def reabrir_lancamento(id_):
     _mudar_status(id_, "aberto", None)
 
 
+def excluir_lancamento(id_):
+    lancamentos = listar_valores_abertos()
+    alvo = next((l for l in lancamentos if l["id"] == id_), None)
+    if not alvo:
+        raise ValueError("Lançamento não encontrado.")
+    _garantir_tabela()
+    _remover_por_id(id_)
+    invalidar_tudo()
+
+
+def sincronizar_valores_abertos_de_campanhas():
+    """Motor ETL simples: para cada lançamento em aberto que veio de uma
+    campanha (campanha_id preenchido), atualiza o valor e a data
+    prevista com a projeção mais atual dessa campanha (valor_campanha_previsto
+    e data_fim, recalculados na hora). Lançamentos já marcados como
+    "recebido" não são tocados — o dinheiro já entrou, não faz sentido
+    o sistema reescrever o valor depois disso.
+
+    Pensado pra ser chamado manualmente (botão em Manutenção) ou de um
+    agendador/cron no futuro, sempre que a produção subjacente às
+    campanhas for atualizada (nova importação de base, por exemplo)."""
+    from lib.campanhas import calcular_cenarios_campanha, listar_campanhas
+
+    lancamentos = [
+        l for l in listar_valores_abertos()
+        if l.get("campanha_id") and l.get("status") == "aberto"
+    ]
+    if not lancamentos:
+        return {"verificados": 0, "atualizados": 0, "campanhas_nao_encontradas": 0}
+
+    campanhas = {c["id"]: c for c in listar_campanhas()}
+    client = get_bigquery_client()
+    table_id = f"{PROJECT}.{DATASET}.{TABELA_VALORES_ABERTOS}"
+
+    atualizados = 0
+    nao_encontradas = 0
+    for lanc in lancamentos:
+        campanha = campanhas.get(lanc["campanha_id"])
+        if not campanha:
+            nao_encontradas += 1
+            continue
+
+        cenarios = calcular_cenarios_campanha(campanha["id"])
+        novo_valor = cenarios["valor_campanha_previsto"]
+        nova_data = _para_date(campanha.get("data_fim"))
+
+        if lanc.get("valor") == novo_valor and lanc.get("data_prevista") == nova_data:
+            continue  # já está em dia, evita regravação desnecessária
+
+        _garantir_tabela()
+        _remover_por_id(lanc["id"])
+        novo = dict(lanc)
+        novo["valor"] = novo_valor
+        novo["data_prevista"] = nova_data
+        pd_frame = pd.DataFrame([novo])
+        job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+        client.load_table_from_dataframe(pd_frame, table_id, job_config=job_config).result()
+        atualizados += 1
+
+    invalidar_tudo()
+    return {"verificados": len(lancamentos), "atualizados": atualizados, "campanhas_nao_encontradas": nao_encontradas}
+
+
 def resumo_valores_abertos():
     """Números pro dashboard de Visão geral: total pendente, previsto pra
     hoje, e em atraso — cada um com a lista de lançamentos por trás."""

@@ -20,6 +20,9 @@ import ValoresAbertosCadastro from "./pages/ValoresAbertosCadastro";
 import ValoresAbertosAcompanhamento from "./pages/ValoresAbertosAcompanhamento";
 
 const SOMENTE_EDITOR_ADMIN = ["admin", "editor"];
+const VISAO_GERAL = ["admin", "editor", "visualizador"];
+const VALORES_ABERTOS_LEITURA = ["admin", "editor", "visualizador", "valores_abertos"];
+const VALORES_ABERTOS_ESCRITA = ["admin", "editor", "valores_abertos"];
 
 export default function App() {
   return (
@@ -33,14 +36,14 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<ProtectedRoute papeis={VISAO_GERAL}><Dashboard /></ProtectedRoute>} />
 
         <Route
           path="/importar"
           element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><Importar /></ProtectedRoute>}
         />
-        <Route path="/logs" element={<Registros />} />
-        <Route path="/relatorio" element={<Relatorio />} />
+        <Route path="/logs" element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><Registros /></ProtectedRoute>} />
+        <Route path="/relatorio" element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><Relatorio /></ProtectedRoute>} />
         <Route
           path="/parametros"
           element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><Parametros /></ProtectedRoute>}
@@ -50,7 +53,7 @@ export default function App() {
           element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><Indicados /></ProtectedRoute>}
         />
 
-        <Route path="/campanhas" element={<CampanhasVisaoGeral />} />
+        <Route path="/campanhas" element={<ProtectedRoute papeis={VISAO_GERAL}><CampanhasVisaoGeral /></ProtectedRoute>} />
         <Route
           path="/campanhas/cadastro"
           element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><CampanhasCadastro /></ProtectedRoute>}
@@ -75,15 +78,15 @@ export default function App() {
 
         <Route
           path="/valores-abertos"
-          element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><ValoresAbertosVisaoGeral /></ProtectedRoute>}
+          element={<ProtectedRoute papeis={VALORES_ABERTOS_LEITURA}><ValoresAbertosVisaoGeral /></ProtectedRoute>}
         />
         <Route
           path="/valores-abertos/cadastro"
-          element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><ValoresAbertosCadastro /></ProtectedRoute>}
+          element={<ProtectedRoute papeis={VALORES_ABERTOS_ESCRITA}><ValoresAbertosCadastro /></ProtectedRoute>}
         />
         <Route
           path="/valores-abertos/acompanhamento"
-          element={<ProtectedRoute papeis={SOMENTE_EDITOR_ADMIN}><ValoresAbertosAcompanhamento /></ProtectedRoute>}
+          element={<ProtectedRoute papeis={VALORES_ABERTOS_ESCRITA}><ValoresAbertosAcompanhamento /></ProtectedRoute>}
         />
       </Route>
     </Routes>

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
 import { Megaphone, Refresh } from "../components/icons";
-import { brl, mesBr, mesAtual, percentual } from "../utils/format";
+import { brl, mesBr, mesAtual, percentual, dataBr } from "../utils/format";
 
 async function buscarBancos() {
   const { data } = await api.get("/bancos");
@@ -180,6 +180,7 @@ export default function CampanhasVisaoGeral() {
                 <tr>
                   <th rowSpan={2}>Banco</th>
                   <th rowSpan={2}>Campanha</th>
+                  <th rowSpan={2}>Período vigente</th>
                   <th rowSpan={2}>Convênio</th>
                   <th rowSpan={2}>Produto</th>
                   <th rowSpan={2}>Status</th>
@@ -217,12 +218,13 @@ export default function CampanhasVisaoGeral() {
               </thead>
               <tbody>
                 {campanhas.length === 0 && (
-                  <tr><td colSpan={5 + 4 + (mostrarProjecao ? 5 : 0) + (mostrarOportunidades ? 5 : 0)} className="muted center">Nenhuma campanha encontrada para esse filtro.</td></tr>
+                  <tr><td colSpan={6 + 4 + (mostrarProjecao ? 5 : 0) + (mostrarOportunidades ? 5 : 0)} className="muted center">Nenhuma campanha encontrada para esse filtro.</td></tr>
                 )}
                 {campanhas.map((c) => (
                   <tr key={c.id}>
                     <td className="small">{c.banco}</td>
                     <td className="small">{c.campanha}</td>
+                    <td className="mono small">{dataBr(c.data_inicio)} — {dataBr(c.data_fim)}</td>
                     <td className="small">{c.filtro_map_convenio?.length ? c.filtro_map_convenio.join(", ") : "Todos"}</td>
                     <td className="small">{c.filtro_map_produto?.length ? c.filtro_map_produto.join(", ") : "Todos"}</td>
                     <td className="small"><StatusChip status={c.status} /></td>

@@ -13,8 +13,13 @@ PROJECT = os.environ.get("BIGQUERY_PROJECT_ID")
 DATASET = os.environ.get("BIGQUERY_DATASET", "base_bancos")
 TABELA_USUARIOS = os.environ.get("BIGQUERY_USUARIOS_TABLE", "usuarios")
 
-PAPEIS_VALIDOS = ["admin", "editor", "visualizador"]
-PAPEIS_LABEL = {"admin": "Admin", "editor": "Editor", "visualizador": "Visualizador"}
+PAPEIS_VALIDOS = ["admin", "editor", "visualizador", "valores_abertos"]
+PAPEIS_LABEL = {
+    "admin": "Admin",
+    "editor": "Editor",
+    "visualizador": "Visualizador",
+    "valores_abertos": "Visualizador de Valores em Aberto",
+}
 
 SCHEMA_USUARIOS = [
     bigquery.SchemaField("email", "STRING"),

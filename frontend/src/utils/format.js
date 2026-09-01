@@ -16,6 +16,12 @@ export function mesAtual() {
   return `${agora.getFullYear()}-${mes}`;
 }
 
+export function dataBr(valor) {
+  if (!valor || typeof valor !== "string" || !valor.includes("-")) return valor || "—";
+  const [ano, mes, dia] = valor.slice(0, 10).split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
 export function percentual(valor) {
   const numero = Number(valor);
   if (valor === "" || valor === null || valor === undefined || Number.isNaN(numero)) return "—";

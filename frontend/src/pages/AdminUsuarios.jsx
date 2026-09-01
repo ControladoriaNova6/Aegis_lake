@@ -6,7 +6,12 @@ import PageHeader from "../components/PageHeader";
 import { Users, Plus, Trash, Settings } from "../components/icons";
 import { useAuth } from "../context/AuthContext";
 
-const PAPEL_LABEL = { admin: "Admin", editor: "Editor", visualizador: "Visualizador" };
+const PAPEL_LABEL = {
+  admin: "Admin",
+  editor: "Editor",
+  visualizador: "Visualizador",
+  valores_abertos: "Visualizador de Valores em Aberto",
+};
 
 async function buscarUsuarios() {
   const { data } = await api.get("/usuarios");
@@ -139,6 +144,7 @@ export default function AdminUsuarios() {
               <option value="admin">Admin</option>
               <option value="editor">Editor</option>
               <option value="visualizador">Visualizador</option>
+              <option value="valores_abertos">Visualizador de Valores em Aberto</option>
             </select>
           </div>
           <div className="form-row form-row-action">

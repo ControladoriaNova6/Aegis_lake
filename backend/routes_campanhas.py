@@ -8,6 +8,7 @@ from lib.campanhas import (
     listar_campanhas,
     salvar_campanha,
     excluir_campanha,
+    renovar_campanha,
     atualizar_status_campanha,
     listar_criterios,
     salvar_criterio,
@@ -28,7 +29,7 @@ bp_campanhas = Blueprint("campanhas", __name__, url_prefix="/api")
 # Campanhas
 # ─────────────────────────────────────────────────────────────────────────
 @bp_campanhas.route("/campanhas", methods=["GET"])
-@login_required
+@requer_papel(["admin", "editor"])
 def campanhas_listar():
     try:
         return jsonify(listar_campanhas())
@@ -37,7 +38,7 @@ def campanhas_listar():
 
 
 @bp_campanhas.route("/campanhas/atingimento")
-@login_required
+@requer_papel(["admin", "editor", "visualizador"])
 def campanhas_atingimento():
     """Campanhas + produção real do período + avaliação de faixa/meta —
     usado na Visão geral de Campanhas (cards e tabela)."""
@@ -57,7 +58,7 @@ def campanhas_atingimento():
 
 
 @bp_campanhas.route("/campanhas/<id_campanha>/relatorio-apuracao/download")
-@login_required
+@requer_papel(["admin", "editor"])
 def campanhas_relatorio_apuracao_download(id_campanha):
     """Toda a produção do banco no período da campanha, com a coluna
     'Valor apuração' calculada linha a linha (aplica % especial dos
@@ -176,11 +177,33 @@ def campanhas_excluir(id_campanha):
     return jsonify({"ok": True})
 
 
+@bp_campanhas.route("/campanhas/<id_campanha>/renovar", methods=["POST"])
+@requer_papel(["admin", "editor"])
+def campanhas_renovar(id_campanha):
+    """Renova a campanha: cria uma campanha nova, com o período informado,
+    clonando faixas/metas e todos os critérios da campanha original."""
+    dados = request.get_json(silent=True) or {}
+    nova_data_inicio = dados.get("data_inicio")
+    nova_data_fim = dados.get("data_fim")
+    if not nova_data_inicio or not nova_data_fim:
+        return jsonify({"erro": "Informe a nova data de início e de fim da apuração."}), 400
+
+    try:
+        novo_id = renovar_campanha(
+            id_campanha, nova_data_inicio, nova_data_fim, criado_por=usuario_atual()["email"],
+        )
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500
+    return jsonify({"id": novo_id})
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Critérios
 # ─────────────────────────────────────────────────────────────────────────
 @bp_campanhas.route("/criterios", methods=["GET"])
-@login_required
+@requer_papel(["admin", "editor"])
 def criterios_listar():
     try:
         return jsonify(listar_criterios())
@@ -249,7 +272,7 @@ def criterios_excluir(id_criterio):
 
 
 @bp_campanhas.route("/criterios/auditoria", methods=["GET"])
-@login_required
+@requer_papel(["admin", "editor"])
 def criterios_auditoria():
     campanha_id = request.args.get("campanha_id") or None
     try:

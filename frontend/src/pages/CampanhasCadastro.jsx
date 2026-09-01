@@ -5,7 +5,7 @@ import api from "../api/client";
 import PageHeader from "../components/PageHeader";
 import MultiSelectDropdown from "../components/MultiSelectDropdown";
 import Modal from "../components/Modal";
-import { Plus, Trash, Settings, DollarSign, Download } from "../components/icons";
+import { Plus, Trash, Settings, DollarSign, Download, Refresh } from "../components/icons";
 import { brl, percentual } from "../utils/format";
 
 const STATUS_OPCOES = ["Vigente", "Finalizada", "Em Apuração"];
@@ -42,6 +42,11 @@ async function buscarValoresMapeados() {
   return data;
 }
 
+async function buscarAtingimento() {
+  const { data } = await api.get("/campanhas/atingimento");
+  return data;
+}
+
 export default function CampanhasCadastro() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(FORM_VAZIO);
@@ -50,6 +55,9 @@ export default function CampanhasCadastro() {
   const [modalValoresAbertos, setModalValoresAbertos] = useState(null);
   const [formValoresAbertos, setFormValoresAbertos] = useState(null);
   const [mensagemValoresAbertos, setMensagemValoresAbertos] = useState(null);
+  const [modalRenovar, setModalRenovar] = useState(null);
+  const [formRenovar, setFormRenovar] = useState({ data_inicio: "", data_fim: "" });
+  const [mensagemRenovar, setMensagemRenovar] = useState(null);
 
   const { data: campanhas = [], isLoading, isError, error } = useQuery({
     queryKey: ["campanhas"],
@@ -63,6 +71,10 @@ export default function CampanhasCadastro() {
   const { data: valoresMapeados = { map_indicado: [], map_convenio: [], map_produto: [] } } = useQuery({
     queryKey: ["valores-mapeados"],
     queryFn: buscarValoresMapeados,
+  });
+  const { data: atingimento = [] } = useQuery({
+    queryKey: ["campanhas-atingimento-cadastro"],
+    queryFn: buscarAtingimento,
   });
 
   function invalidarCampanhas() {
@@ -117,13 +129,45 @@ export default function CampanhasCadastro() {
     onError: (err) => setMensagemValoresAbertos({ ok: false, texto: err?.response?.data?.erro || err.message }),
   });
 
+  const renovarMutation = useMutation({
+    mutationFn: ({ id, dados }) => api.post(`/campanhas/${id}/renovar`, dados),
+    onSuccess: () => {
+      invalidarCampanhas();
+      setMensagemRenovar({ ok: true, texto: "Campanha renovada — critérios e faixas foram copiados pra nova campanha." });
+      setTimeout(fecharModalRenovar, 1500);
+    },
+    onError: (err) => setMensagemRenovar({ ok: false, texto: err?.response?.data?.erro || err.message }),
+  });
+
+  function abrirModalRenovar(campanha) {
+    setModalRenovar(campanha);
+    setFormRenovar({ data_inicio: "", data_fim: "" });
+    setMensagemRenovar(null);
+  }
+
+  function fecharModalRenovar() {
+    setModalRenovar(null);
+    setMensagemRenovar(null);
+  }
+
+  function handleConfirmarRenovar(e) {
+    e.preventDefault();
+    if (!formRenovar.data_inicio || !formRenovar.data_fim) {
+      setMensagemRenovar({ ok: false, texto: "Informe a nova data de início e de fim da apuração." });
+      return;
+    }
+    renovarMutation.mutate({ id: modalRenovar.id, dados: formRenovar });
+  }
+
   function abrirModalValoresAbertos(campanha) {
+    const cenario = atingimento.find((a) => a.id === campanha.id);
+    const valorPrevisto = cenario ? cenario.valor_campanha_previsto : 0;
     setModalValoresAbertos(campanha);
     setFormValoresAbertos({
       banco: campanha.banco || "",
       categoria: "Campanha",
       periodo_ref: campanha.campanha || "",
-      valor: "",
+      valor: valorPrevisto,
       data_prevista: campanha.data_fim || "",
       campanha_id: campanha.id,
     });
@@ -161,7 +205,7 @@ export default function CampanhasCadastro() {
 
   function handleSalvarValorAberto(e) {
     e.preventDefault();
-    if (!formValoresAbertos.banco || !formValoresAbertos.categoria || !formValoresAbertos.valor || !formValoresAbertos.data_prevista) {
+    if (!formValoresAbertos.banco || !formValoresAbertos.categoria || formValoresAbertos.valor == null || !formValoresAbertos.data_prevista) {
       setMensagemValoresAbertos({ ok: false, texto: "Preencha Banco, Categoria, Valor e Data prevista." });
       return;
     }
@@ -408,6 +452,9 @@ export default function CampanhasCadastro() {
                     >
                       <Download />
                     </button>
+                    <button className="btn-link" onClick={() => abrirModalRenovar(c)} title="Renovar campanha (cria uma nova campanha copiando critérios e faixas)" style={{ marginRight: "0.4rem" }}>
+                      <Refresh />
+                    </button>
                     <button className="btn-danger" onClick={() => { if (window.confirm(`Remover a campanha "${c.campanha}"?`)) excluirMutation.mutate(c.id); }} title="Excluir">
                       <Trash />
                     </button>
@@ -460,8 +507,13 @@ export default function CampanhasCadastro() {
                   <td><input type="text" value={formValoresAbertos.periodo_ref} onChange={(e) => setFormValoresAbertos((f) => ({ ...f, periodo_ref: e.target.value }))} /></td>
                 </tr>
                 <tr>
-                  <td className="form-table-label">Valor</td>
-                  <td><input type="number" step="0.01" value={formValoresAbertos.valor} onChange={(e) => setFormValoresAbertos((f) => ({ ...f, valor: e.target.value }))} /></td>
+                  <td className="form-table-label">Valor previsto</td>
+                  <td>
+                    <input type="text" value={brl(formValoresAbertos.valor)} disabled title="Valor previsto atual da campanha (não editável) — vem do cenário de Projeção da Visão geral." />
+                    <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+                      Puxado automaticamente da projeção atual da campanha — não é digitado aqui.
+                    </p>
+                  </td>
                 </tr>
                 <tr>
                   <td className="form-table-label">Data prevista</td>
@@ -475,6 +527,50 @@ export default function CampanhasCadastro() {
                 <Plus /> {criarValorAbertoMutation.isPending ? "Salvando…" : "Adicionar"}
               </button>
               <button type="button" className="btn-link" onClick={fecharModalValoresAbertos}>Fechar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {modalRenovar && (
+        <Modal onClose={fecharModalRenovar} width={420}>
+          <p className="section-title" style={{ marginTop: 0 }}>
+            Renovar campanha — {modalRenovar.campanha}
+          </p>
+          <p className="muted small">
+            Cria uma campanha nova, com o período abaixo, copiando as faixas/metas e todos os
+            critérios já cadastrados em "{modalRenovar.campanha}". A campanha original não é alterada.
+          </p>
+
+          {mensagemRenovar && (
+            <div className={mensagemRenovar.ok ? "card status-card-ok" : "card error-card"} style={{ marginBottom: "1rem" }}>
+              {mensagemRenovar.ok ? (
+                <p style={{ margin: 0 }}><span className="status-dot ok" />{mensagemRenovar.texto}</p>
+              ) : (
+                <><p className="error-title">Não foi possível renovar</p><p className="muted small">{mensagemRenovar.texto}</p></>
+              )}
+            </div>
+          )}
+
+          <form onSubmit={handleConfirmarRenovar}>
+            <table className="form-table">
+              <tbody>
+                <tr>
+                  <td className="form-table-label">Nova data início</td>
+                  <td><input type="date" value={formRenovar.data_inicio} onChange={(e) => setFormRenovar((f) => ({ ...f, data_inicio: e.target.value }))} /></td>
+                </tr>
+                <tr>
+                  <td className="form-table-label">Nova data fim</td>
+                  <td><input type="date" value={formRenovar.data_fim} onChange={(e) => setFormRenovar((f) => ({ ...f, data_fim: e.target.value }))} /></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div className="filter-actions" style={{ marginTop: "1rem" }}>
+              <button type="submit" disabled={renovarMutation.isPending}>
+                <Refresh /> {renovarMutation.isPending ? "Renovando…" : "Renovar campanha"}
+              </button>
+              <button type="button" className="btn-link" onClick={fecharModalRenovar}>Fechar</button>
             </div>
           </form>
         </Modal>
