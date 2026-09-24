@@ -150,11 +150,25 @@ def resumo_por_mes(banco, meses):
 
 
 @cached()
-def resumo_hierarquico(banco, meses):
+def resumo_hierarquico(banco, meses, produto=None, nome_convenio=None):
     """Soma de vlr_liquido agrupada em banco -> convênio -> produto, para a
-    tabela expansível (accordion) abaixo do gráfico."""
+    tabela abaixo do gráfico.
+
+    Convênio e Produto aqui vêm das colunas TRATADAS (map_convenio/
+    map_produto — ver Mapeamento), caindo pro valor bruto só enquanto
+    essas colunas ainda não estiverem populadas pra aquela linha; o
+    nome exibido no front continua sendo só "Convênio"/"Produto".
+
+    `produto` filtra pelo valor tratado exato (mesma lista usada no
+    filtro da tela). `nome_convenio` busca (contém, sem diferenciar
+    maiúscula/minúscula) no CONVÊNIO BRUTO/original — útil pra achar
+    produção antes mesmo dela estar padronizada pelo Mapeamento."""
     if not meses:
         return []
+
+    from lib.manutencao import garantir_colunas_map
+
+    garantir_colunas_map()
 
     client = get_bigquery_client()
     tabela = f"`{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}`"
@@ -162,18 +176,22 @@ def resumo_hierarquico(banco, meses):
     query = f"""
         SELECT
           banco,
-          IFNULL(convenio, '(sem convênio)') AS convenio,
-          IFNULL(produto, '(sem produto)') AS produto,
+          IFNULL(IFNULL(map_convenio, convenio), '(sem convênio)') AS convenio,
+          IFNULL(IFNULL(map_produto, produto), '(sem produto)') AS produto,
           SUM(vlr_liquido) AS producao
         FROM {tabela}
         WHERE FORMAT_DATE('%Y-%m', {DATE_COLUMN}) IN UNNEST(@meses)
           AND (@banco IS NULL OR UPPER(banco) = @banco)
+          AND (@produto IS NULL OR IFNULL(map_produto, produto) = @produto)
+          AND (@nome_convenio IS NULL OR LOWER(IFNULL(convenio, '')) LIKE CONCAT('%', LOWER(@nome_convenio), '%'))
         GROUP BY banco, convenio, produto
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
             bigquery.ArrayQueryParameter("meses", "STRING", meses),
             bigquery.ScalarQueryParameter("banco", "STRING", banco.upper() if banco else None),
+            bigquery.ScalarQueryParameter("produto", "STRING", produto or None),
+            bigquery.ScalarQueryParameter("nome_convenio", "STRING", nome_convenio or None),
         ]
     )
     rows = list(client.query(query, job_config=job_config).result())

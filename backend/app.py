@@ -54,6 +54,7 @@ from routes_parametros import bp_parametros
 from routes_indicados import bp_indicados
 from routes_manutencao import bp_manutencao
 from routes_valores_abertos import bp_valores_abertos
+from routes_mapeamento_categorias import bp_mapeamento_categorias
 
 app.register_blueprint(bp_auth)
 app.register_blueprint(bp_dashboard)
@@ -67,6 +68,7 @@ app.register_blueprint(bp_parametros)
 app.register_blueprint(bp_indicados)
 app.register_blueprint(bp_manutencao)
 app.register_blueprint(bp_valores_abertos)
+app.register_blueprint(bp_mapeamento_categorias)
 
 # Aquecimento em background (mesmo mecanismo do projeto anterior) — deixa o
 # cache do SERVIDOR já quente pra qualquer usuário/sessão nova. É uma

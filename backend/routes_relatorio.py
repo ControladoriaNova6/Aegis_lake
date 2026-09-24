@@ -10,6 +10,12 @@ from lib.dashboard import listar_meses_disponiveis, mes_atual
 
 bp_relatorio = Blueprint("relatorio", __name__, url_prefix="/api")
 
+# Acima disso, gerar o Excel em memória (num plano com pouca RAM/CPU, tipo
+# o free do Render, rodando com 1 worker) arrisca estourar tempo ou
+# memória e a conexão cair sem resposta nenhuma — melhor recusar de
+# cara com uma mensagem clara do que travar silenciosamente.
+LIMITE_LINHAS_RELATORIO = 200_000
+
 
 def _params_do_request(args):
     banco = args.get("banco") or None
@@ -45,7 +51,24 @@ def relatorio_contagem():
 @bp_relatorio.route("/relatorio/download")
 @requer_papel(["admin", "editor"])
 def relatorio_download():
-    banco, data_inicio, data_fim, cod_master, cod_indicado, _, _ = _params_do_request(request.args)
+    banco, data_inicio, data_fim, cod_master, cod_indicado, mes_inicio, mes_fim = _params_do_request(request.args)
+
+    try:
+        total = contar_relatorio(banco, data_inicio, data_fim, cod_master, cod_indicado)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500
+
+    if total == 0:
+        return jsonify({"erro": "Nenhum registro encontrado para esse filtro."}), 400
+
+    if total > LIMITE_LINHAS_RELATORIO:
+        return jsonify({
+            "erro": (
+                f"Esse filtro tem {total:,} registros — acima do limite de {LIMITE_LINHAS_RELATORIO:,} pra gerar "
+                "o Excel de uma vez (evita o servidor travar sem resposta). Restrinja o período ou filtre por "
+                "banco/Cód. Master/Cód. Indicado e tente de novo."
+            ).replace(",", "."),
+        }), 400
 
     try:
         df = gerar_relatorio_df(banco, data_inicio, data_fim, cod_master, cod_indicado)

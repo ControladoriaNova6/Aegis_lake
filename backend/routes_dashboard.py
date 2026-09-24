@@ -19,13 +19,15 @@ def dashboard():
     banco = request.args.get("banco") or None
     mes_inicio = request.args.get("mes_inicio") or mes_atual()
     mes_fim = request.args.get("mes_fim") or mes_atual()
+    produto = request.args.get("produto") or None
+    nome_convenio = request.args.get("nome_convenio") or None
 
     meses_selecionados = expandir_intervalo_meses(mes_inicio, mes_fim)
 
     try:
         meses_disponiveis = listar_meses_disponiveis()
         dados_diarios = resumo_por_dia(banco, meses_selecionados)
-        arvore = resumo_hierarquico(banco, meses_selecionados)
+        arvore = resumo_hierarquico(banco, meses_selecionados, produto=produto, nome_convenio=nome_convenio)
         projecao = projecao_mes_atual(banco)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"erro": str(exc)}), 500

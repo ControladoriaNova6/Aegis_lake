@@ -21,8 +21,17 @@ _lock_colunas_map = threading.Lock()
 def garantir_colunas_map():
     """A tabela principal já existia antes desse projeto — não é criada
     por nós. Se as colunas de tratamento ainda não existirem nela, tenta
-    adicionar via ALTER TABLE (uma vez por processo). Mesmo padrão de
-    lib/importador.py (garantir_coluna_indicado)."""
+    adicionar via ALTER TABLE (uma vez por processo) — mas só marca como
+    "já garantido" depois de CONFIRMAR que as colunas realmente existem.
+    Antes, qualquer erro no meio do caminho (permissão insuficiente,
+    falha de rede, etc.) era engolido silenciosamente e a função mesmo
+    assim se marcava como "já rodou", travando pro resto da vida do
+    processo — ou seja, se essa criação falhasse uma vez só, as colunas
+    nunca mais eram tentadas de novo, e o motor de Mapeamento ficava
+    rodando pra sempre contra uma tabela sem map_convenio/map_produto,
+    sem nunca avisar ninguém (o "não mapeou nada" ficava em silêncio).
+    Agora, se a criação falhar, a exceção sobe pra quem chamou — pra
+    aparecer como erro na tela, em vez de sumir."""
     global _colunas_map_garantidas
     if _colunas_map_garantidas:
         return
@@ -30,17 +39,31 @@ def garantir_colunas_map():
     with _lock_colunas_map:
         if _colunas_map_garantidas:
             return
-        try:
-            client = get_bigquery_client()
-            table_id = f"{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}"
-            table = client.get_table(table_id)
-            existentes = {f.name for f in table.schema}
-            novas = [bigquery.SchemaField(c, "STRING") for c in COLUNAS_MAP if c not in existentes]
-            if novas:
-                table.schema = list(table.schema) + novas
+        client = get_bigquery_client()
+        table_id = f"{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}"
+        table = client.get_table(table_id)
+        existentes = {f.name for f in table.schema}
+        faltando = [c for c in COLUNAS_MAP if c not in existentes]
+
+        if faltando:
+            try:
+                table.schema = list(table.schema) + [bigquery.SchemaField(c, "STRING") for c in faltando]
                 client.update_table(table, ["schema"])
-        except Exception:  # noqa: BLE001
-            pass
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(
+                    f"Não foi possível criar a(s) coluna(s) {', '.join(faltando)} na base consolidada "
+                    f"(confira a permissão de ALTER TABLE do BigQuery): {exc}"
+                ) from exc
+
+            tabela_confirmada = client.get_table(table_id)
+            existentes_agora = {f.name for f in tabela_confirmada.schema}
+            ainda_faltando = [c for c in faltando if c not in existentes_agora]
+            if ainda_faltando:
+                raise RuntimeError(
+                    f"A(s) coluna(s) {', '.join(ainda_faltando)} não apareceram na base consolidada mesmo "
+                    "depois do ALTER TABLE — confira manualmente no BigQuery."
+                )
+
         _colunas_map_garantidas = True
 
 

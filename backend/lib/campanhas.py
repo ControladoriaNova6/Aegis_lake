@@ -500,7 +500,7 @@ def _detalhes_producao_campanha(campanha, data_inicio, data_fim):
         SELECT
             {DATE_COLUMN} AS data_pagamento,
             convenio, produto, map_convenio, map_produto,
-            cod_tabela, tabela, vlr_liquido, vlr_bruto
+            cod_tabela, tabela, vlr_liquido, vlr_bruto, prazo
         FROM {tabela}
         WHERE {where_sql}
     """
@@ -598,12 +598,13 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
     "Valor Campanha" em qualquer um dos três cenários é a soma, linha a
     linha, do que cada proposta de produção vale conforme os critérios
     cadastrados e a faixa (percentual de bônus) que a campanha atingiu:
+      - linha que NÃO bate com nenhum critério da campanha → vale 0 (só
+        entra no cálculo o que está coberto por alguma regra cadastrada);
       - critério marcado "Não contabilizar" → contrato vale 0;
       - critério com % especial cadastrado → contrato vale valor × %
         especial (o % especial sempre manda, independente da faixa);
-      - contrato sem % especial (critério "inclusivo" ou nenhum
-        critério bate) → contrato vale valor × percentual da faixa
-        atingida pela campanha;
+      - critério bateu mas sem % especial ("inclusivo") → contrato vale
+        valor × percentual da faixa atingida pela campanha;
     e fica zerado por completo se a campanha ainda não tiver alcançado nenhuma
     faixa."""
     campanhas = listar_campanhas()
@@ -644,50 +645,75 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
 
     # 1ª passada: soma a produção total e já resolve, linha a linha, qual
     # critério bate (isso não muda com a faixa da campanha, então dá pra
-    # calcular uma vez só e reaproveitar na 2ª passada).
+    # calcular uma vez só e reaproveitar depois).
     producao_atual = 0.0
     datas_com_producao = set()
     linhas_com_criterio = []
     for linha in linhas:
-        valor_base = float(linha.get(coluna_valor) or 0)
-        producao_atual += valor_base
+        valor_base_campanha = float(linha.get(coluna_valor) or 0)
+        producao_atual += valor_base_campanha
         if linha.get("data_pagamento"):
             datas_com_producao.add(linha["data_pagamento"])
-        criterio_encontrado = next((c for c in criterios_da_campanha if _criterio_aplica(c, linha)), None)
-        linhas_com_criterio.append((valor_base, criterio_encontrado))
+        criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha)
+        linhas_com_criterio.append((linha, criterio_encontrado))
 
-    # A faixa (percentual de bônus) só pode ser conhecida depois de somar
-    # toda a produção do período — por isso o cenário atual precisa da
-    # avaliação de faixas ANTES da 2ª passada, que calcula o valor de
-    # apuração de cada contrato já usando esse percentual.
-    aval_atual = _avaliar_faixas(faixas_metas, producao_atual)
-    faixa_pct_atual = (aval_atual["faixa_atingida"] or 0.0) / 100
-
-    valor_apuracao_atual = 0.0
+    # 2ª passada: separa o que cada contrato vale em duas partes, porque
+    # elas seguem regras BEM diferentes:
+    #   - "valor_perc_especial": contratos com % especial cadastrado —
+    #     não depende de qual faixa a campanha atinge, então é o MESMO
+    #     valor não importa se estamos olhando o cenário atual, a
+    #     projeção ou a oportunidade;
+    #   - "producao_inclusiva": a produção (ainda SEM aplicar percentual
+    #     nenhum) dos contratos "inclusivos" (bateram um critério, sem %
+    #     especial) — essa é a parte que precisa da % da faixa, e cada
+    #     cenário (atual/projeção/oportunidade) atinge uma faixa
+    #     DIFERENTE, então essa multiplicação só pode acontecer depois,
+    #     usando a faixa certa de cada cenário (ver abaixo). Antes, um
+    #     único "taxa_apuracao" (baseado só na faixa atual) era aplicado
+    #     em cima da projeção inteira — o que zerava a projeção sempre
+    #     que a faixa atual ainda não tivesse sido alcançada, mesmo
+    #     quando a PRÓPRIA produção projetada já cruzava uma meta.
+    valor_perc_especial_atual = 0.0
+    producao_inclusiva_atual = 0.0
     if criterios_da_campanha:
-        for valor_base, criterio_encontrado in linhas_com_criterio:
-            if criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
-                pass  # soma 0
-            elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
-                valor_apuracao_atual += valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
+        for linha, criterio_encontrado in linhas_com_criterio:
+            if criterio_encontrado is None:
+                continue  # nenhum critério bate essa linha -> não conta pra campanha
+            if criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+                continue  # soma 0
+            # O valor do CONTRATO usa a coluna (líquido/bruto) que O
+            # CRITÉRIO que bateu escolheu — não a coluna padrão da
+            # campanha. Cada critério pode ter seu próprio "Valor base";
+            # ignorar isso fazia um critério cadastrado como "bruto"
+            # calcular pelo líquido sempre que a campanha estivesse
+            # configurada como líquido (ou vice-versa).
+            coluna_valor_criterio = "vlr_bruto" if criterio_encontrado.get("base_producao_criterio") == "bruto" else "vlr_liquido"
+            valor_base_linha = float(linha.get(coluna_valor_criterio) or 0)
+            if criterio_encontrado.get("perc_especial"):
+                valor_perc_especial_atual += valor_base_linha * (float(criterio_encontrado["perc_especial"]) / 100)
             else:
-                # Contrato sem % especial cadastrado (critério "inclusivo" ou
-                # nenhum critério bateu): segue a regra geral da campanha —
-                # produção do contrato × percentual da faixa atingida.
-                valor_apuracao_atual += valor_base * faixa_pct_atual
+                # Critério bateu (convênio/produto/tabela) mas sem % especial
+                # cadastrado ("inclusivo"): segue a regra geral da campanha —
+                # a % da faixa é aplicada depois, com a faixa de cada cenário.
+                producao_inclusiva_atual += valor_base_linha
     # Sem nenhum critério cadastrado pra campanha, não existe recebimento
     # possível — a produção pode até bater a meta, mas não há regra
-    # nenhuma dizendo quanto pagar por ela, então valor_apuracao_atual
-    # (e tudo que deriva dele: projeção e oportunidade) fica zerado.
+    # nenhuma dizendo quanto pagar por ela, então tudo fica zerado.
+
+    aval_atual = _avaliar_faixas(faixas_metas, producao_atual)
+    faixa_pct_atual = (aval_atual["faixa_atingida"] or 0.0) / 100
+    valor_apuracao_atual = valor_perc_especial_atual + producao_inclusiva_atual * faixa_pct_atual
 
     # ── 1. Cenário atual ─────────────────────────────────────────────
     valor_campanha_atual = valor_apuracao_atual if aval_atual["tier_atingido"] else 0.0
 
-    # taxa média de apuração (o quanto, na média, cada R$1 de produção
-    # rende depois de aplicar os critérios) — usada pra projetar valor
-    # em cenários futuros/hipotéticos, assumindo que a mesma mistura de
-    # critérios continua valendo.
-    taxa_apuracao = (valor_apuracao_atual / producao_atual) if producao_atual > 0 else 1.0
+    # Daqui pra frente (projeção e oportunidade), assume-se que a MESMA
+    # proporção de produção segue "especial" vs. "inclusiva" — o que muda
+    # é qual faixa cada cenário atinge, então essas duas taxas (uma por
+    # R$ de produção total) ficam fixas e a % da faixa entra só na hora
+    # de calcular cada cenário.
+    taxa_especial_por_producao = (valor_perc_especial_atual / producao_atual) if producao_atual > 0 else 0.0
+    proporcao_inclusiva = (producao_inclusiva_atual / producao_atual) if producao_atual > 0 else 0.0
 
     # ── 2. Projeção até o fim da campanha ────────────────────────────
     # A projeção sempre mira o fim REAL da campanha (df_campanha), não o
@@ -704,16 +730,26 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
     producao_prevista = producao_atual + (media_diaria * dias_uteis_restantes)
 
     aval_prevista = _avaliar_faixas(faixas_metas, producao_prevista)
-    valor_campanha_previsto = (producao_prevista * taxa_apuracao) if aval_prevista["tier_atingido"] else 0.0
+    faixa_pct_prevista = (aval_prevista["faixa_atingida"] or 0.0) / 100
+    valor_apuracao_previsto = (
+        producao_prevista * taxa_especial_por_producao + producao_prevista * proporcao_inclusiva * faixa_pct_prevista
+    )
+    valor_campanha_previsto = valor_apuracao_previsto if aval_prevista["tier_atingido"] else 0.0
 
     # ── 3. Oportunidades (baseado no que já foi produzido, não na projeção) ──
     # "proxima_meta" é o valor de produção (R$) que falta alcançar; é
     # contra ela (não contra "proxima_faixa", que é só o percentual de
-    # bônus daquela faixa) que a produção precisa ser comparada.
+    # bônus daquela faixa) que a produção precisa ser comparada. E o
+    # valor dessa oportunidade usa a % da PRÓXIMA faixa (a que se quer
+    # alcançar) na parte inclusiva — não a faixa atual (que ainda nem foi
+    # alcançada) nem a faixa da projeção (que pode ser uma faixa diferente).
     proxima_faixa = aval_atual["proxima_faixa"]
     proxima_meta = aval_atual["proxima_meta"]
+    proxima_faixa_pct = (proxima_faixa or 0.0) / 100
     producao_necessaria = (proxima_meta - producao_atual) if proxima_meta is not None else None
-    valor_campanha_oportunidade = (proxima_meta * taxa_apuracao) if proxima_meta is not None else None
+    valor_campanha_oportunidade = (
+        proxima_meta * taxa_especial_por_producao + proxima_meta * proporcao_inclusiva * proxima_faixa_pct
+    ) if proxima_meta is not None else None
 
     return {
         "producao_atual": round(producao_atual, 2),
@@ -739,7 +775,12 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
 def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None, busca_campanha=None):
     """Lista as campanhas (com filtro opcional de banco/campanha) já
     calculando, pra cada uma, os 3 cenários financeiros (ver
-    calcular_cenarios_campanha)."""
+    calcular_cenarios_campanha).
+
+    Quando data_inicio/data_fim são informados, só entram campanhas cujo
+    período de apuração TEM ALGUMA SOBREPOSIÇÃO com esse filtro — uma
+    campanha de março não deve aparecer quando o filtro pede junho, por
+    exemplo, mesmo que ela ainda exista no cadastro."""
     campanhas = listar_campanhas()
 
     if banco:
@@ -747,6 +788,20 @@ def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None
     if busca_campanha:
         termo = busca_campanha.lower()
         campanhas = [c for c in campanhas if termo in (c.get("campanha") or "").lower()]
+
+    di_filtro = _para_date(data_inicio)
+    df_filtro = _para_date(data_fim)
+    if di_filtro or df_filtro:
+        def _sobrepoe(c):
+            di_c = _para_date(c.get("data_inicio"))
+            df_c = _para_date(c.get("data_fim"))
+            if di_c and df_filtro and di_c > df_filtro:
+                return False
+            if df_c and di_filtro and df_c < di_filtro:
+                return False
+            return True
+
+        campanhas = [c for c in campanhas if _sobrepoe(c)]
 
     resultado = []
     for campanha in campanhas:
@@ -762,12 +817,24 @@ def listar_campanhas_com_atingimento(banco=None, data_inicio=None, data_fim=None
 # ─────────────────────────────────────────────────────────────────────────
 STATUS_CRITERIO_NAO_CONTABILIZAR = "nao_contabilizar"
 
+# Valor gravado pelo formulário quando a versão anterior da tela oferecia
+# uma opção "(vazio)" que restringia o critério só a linhas SEM
+# map_convenio/map_produto ainda. Pela regra de negócio, "vazio" tem que
+# se comportar exatamente como não escolher nada (não filtra por esse
+# campo — considera toda a produção, valendo-se só de Tabela/Cód. Tabela
+# se o critério tiver isso definido). Mantemos essa constante só pra
+# critérios já salvos com esse valor continuarem funcionando (tratados
+# como "sem filtro"), sem precisar de uma migração manual na base.
+VALOR_VAZIO_LEGADO = "__vazio__"
+
 
 def _criterio_aplica(criterio, linha):
-    """Um critério "aplica" numa linha de produção se convênio e produto
-    baterem (quando o critério define esses campos) — e, se o critério
-    também tiver uma tabela definida, ela precisa bater com a tabela/
-    código de tabela da linha.
+    """Um critério "aplica" numa linha de produção se TODOS os filtros que
+    ele definir baterem: convênio, produto, tabela, prazo (min/max), valor
+    (min/max) e vigência (data_inicio/data_fim do critério contra a data
+    de pagamento da linha). Um filtro que o critério deixou em branco
+    simplesmente não restringe nada (considera toda a produção nesse
+    quesito) — só os que foram preenchidos é que precisam bater.
 
     Convênio e Produto do critério vêm das colunas TRATADAS (map_convenio/
     map_produto — ver Manutenção → Cruzar dados), não da coluna bruta da
@@ -775,32 +842,126 @@ def _criterio_aplica(criterio, linha):
     de Convênio/Produto no cadastro do critério. Por isso a comparação
     usa map_convenio/map_produto da linha, caindo pro valor bruto
     (convenio/produto) só enquanto essas colunas tratadas ainda não
-    estiverem populadas pra aquela linha."""
-    if criterio.get("convenio"):
+    estiverem populadas pra aquela linha.
+
+    Convênio/Produto em branco (ou = VALOR_VAZIO_LEGADO) significa "não
+    filtra por esse campo" — considera toda a produção nesse quesito."""
+    convenio_criterio = criterio.get("convenio")
+    if convenio_criterio and convenio_criterio != VALOR_VAZIO_LEGADO:
         convenio_linha = linha.get("map_convenio") or linha.get("convenio")
-        if (convenio_linha or "").strip().upper() != (criterio["convenio"] or "").strip().upper():
+        if (convenio_linha or "").strip().upper() != convenio_criterio.strip().upper():
             return False
-    if criterio.get("produto"):
+    produto_criterio = criterio.get("produto")
+    if produto_criterio and produto_criterio != VALOR_VAZIO_LEGADO:
         produto_linha = linha.get("map_produto") or linha.get("produto")
-        if (produto_linha or "").strip().upper() != (criterio["produto"] or "").strip().upper():
+        if (produto_linha or "").strip().upper() != produto_criterio.strip().upper():
             return False
     if criterio.get("tabela"):
         tabela_linha = str(linha.get("cod_tabela") or linha.get("tabela") or "").strip()
         if tabela_linha != str(criterio["tabela"]).strip():
             return False
+
+    if criterio.get("prazo_min") is not None or criterio.get("prazo_max") is not None:
+        prazo_linha = linha.get("prazo")
+        if prazo_linha is None:
+            return False  # critério exige prazo, mas a linha não tem prazo informado
+        prazo_linha = float(prazo_linha)
+        if criterio.get("prazo_min") is not None and prazo_linha < float(criterio["prazo_min"]):
+            return False
+        if criterio.get("prazo_max") is not None and prazo_linha > float(criterio["prazo_max"]):
+            return False
+
+    if criterio.get("valor_min") is not None or criterio.get("valor_max") is not None:
+        # Compara contra a MESMA coluna de valor (líquido/bruto) que esse
+        # critério usa pra calcular o próprio valor de apuração.
+        coluna_valor_criterio = "vlr_bruto" if criterio.get("base_producao_criterio") == "bruto" else "vlr_liquido"
+        valor_linha = linha.get(coluna_valor_criterio)
+        if valor_linha is None:
+            return False
+        valor_linha = float(valor_linha)
+        if criterio.get("valor_min") is not None and valor_linha < float(criterio["valor_min"]):
+            return False
+        if criterio.get("valor_max") is not None and valor_linha > float(criterio["valor_max"]):
+            return False
+
+    if criterio.get("data_inicio") or criterio.get("data_fim"):
+        data_linha = linha.get("data_pagamento")
+        if data_linha is None:
+            return False
+        data_linha = data_linha.date() if hasattr(data_linha, "date") and not isinstance(data_linha, date) else data_linha
+        di_criterio = _para_date(criterio.get("data_inicio"))
+        df_criterio = _para_date(criterio.get("data_fim"))
+        if di_criterio and data_linha < di_criterio:
+            return False
+        if df_criterio and data_linha > df_criterio:
+            return False
+
     return True
+
+
+def _especificidade_criterio(criterio):
+    """Quantos filtros esse critério realmente restringe — usado como
+    desempate quando mais de um critério do MESMO nível de prioridade
+    bate na mesma linha (ex: dois critérios com % especial, um mais
+    amplo e um mais específico dentro do mesmo grupo)."""
+    campos_preenchidos = [
+        bool(criterio.get("convenio")) and criterio.get("convenio") != VALOR_VAZIO_LEGADO,
+        bool(criterio.get("produto")) and criterio.get("produto") != VALOR_VAZIO_LEGADO,
+        bool(criterio.get("tabela")),
+        criterio.get("prazo_min") is not None,
+        criterio.get("prazo_max") is not None,
+        criterio.get("valor_min") is not None,
+        criterio.get("valor_max") is not None,
+        bool(criterio.get("data_inicio")),
+        bool(criterio.get("data_fim")),
+    ]
+    return sum(1 for c in campos_preenchidos if c)
+
+
+def _prioridade_criterio(criterio):
+    """Regra de negócio de prioridade entre critérios que batem na MESMA
+    linha: % especial > Não contabilizar > Incluído por regra (inclusivo).
+    Um critério com % especial cadastrado sempre manda, mesmo que outro
+    critério mais amplo (só "inclusivo") também bata na mesma linha — e um
+    "Não contabilizar" específico exclui a linha mesmo que ela também se
+    enquadre num critério inclusivo mais amplo do mesmo grupo."""
+    if criterio.get("perc_especial"):
+        return 3
+    if criterio.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+        return 2
+    return 1
+
+
+def _escolher_criterio_da_linha(criterios_da_campanha, linha):
+    """Entre TODOS os critérios da campanha que baterem nessa linha,
+    escolhe um só, pela prioridade da regra de negócio (ver
+    _prioridade_criterio); em caso de empate no mesmo nível, vence o mais
+    específico (_especificidade_criterio); e se ainda empatar, o
+    cadastrado mais recentemente (desempate determinístico de último
+    caso — não é a regra principal). Se nenhum critério bater, None."""
+    candidatos = [c for c in criterios_da_campanha if _criterio_aplica(c, linha)]
+    if not candidatos:
+        return None
+    candidatos.sort(
+        key=lambda c: (_prioridade_criterio(c), _especificidade_criterio(c), c.get("criado_em") or datetime.min),
+        reverse=True,
+    )
+    return candidatos[0]
 
 
 def gerar_relatorio_apuracao(campanha_id):
     """Toda a produção do banco da campanha, no período da campanha —
     com uma coluna a mais (valor_apuracao) calculada linha a linha, com
     a mesma regra usada na Visão geral (ver calcular_cenarios_campanha):
-      - se algum critério da campanha bater com a linha e estiver
-        marcado "Não contabilizar" → valor_apuracao = 0
+      - se NENHUM critério da campanha bater com a linha → valor_apuracao = 0
+        (a linha simplesmente não está coberta por nenhuma regra dessa
+        campanha, então não conta pra ela);
+      - se algum critério bater e estiver marcado "Não contabilizar" →
+        valor_apuracao = 0
       - se algum critério bater e tiver % especial definido →
         valor_apuracao = valor da linha (líquido/bruto conforme a
         campanha) * (perc_especial / 100)
-      - senão (nenhum critério bate, ou bate sem % especial) →
+      - se algum critério bater sem % especial ("inclusivo") →
         valor_apuracao = valor da linha * (percentual da faixa que a
         campanha atingiu no período, com base na produção total)."""
     from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
@@ -824,7 +985,7 @@ def gerar_relatorio_apuracao(campanha_id):
 
     colunas = [
         "data_pagamento", "ade", "banco", "convenio", "produto", "map_convenio", "map_produto",
-        "cod_tabela", "tabela", "vlr_liquido", "vlr_bruto", "usuario", "cod_corretor", "cod_master", "cod_indicado",
+        "cod_tabela", "tabela", "vlr_liquido", "vlr_bruto", "prazo", "usuario", "cod_corretor", "cod_master", "cod_indicado",
     ]
     query = f"""
         SELECT {", ".join(colunas)}
@@ -853,18 +1014,23 @@ def gerar_relatorio_apuracao(campanha_id):
     resultado = []
     for linha in linhas:
         linha_dict = dict(linha)
-        valor_base = float(linha_dict.get(coluna_valor) or 0)
 
-        criterio_encontrado = next((c for c in criterios_da_campanha if _criterio_aplica(c, linha_dict)), None)
+        criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha_dict)
 
-        if sem_criterios:
+        if sem_criterios or criterio_encontrado is None:
             valor_apuracao = 0.0
-        elif criterio_encontrado and criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
+        elif criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
             valor_apuracao = 0.0
-        elif criterio_encontrado and criterio_encontrado.get("perc_especial"):
-            valor_apuracao = valor_base * (float(criterio_encontrado["perc_especial"]) / 100)
         else:
-            valor_apuracao = valor_base * faixa_pct
+            # Mesma regra do cenário atual: usa a coluna (líquido/bruto)
+            # que O CRITÉRIO escolheu como "Valor base", não a coluna
+            # padrão da campanha.
+            coluna_valor_criterio = "vlr_bruto" if criterio_encontrado.get("base_producao_criterio") == "bruto" else "vlr_liquido"
+            valor_base_linha = float(linha_dict.get(coluna_valor_criterio) or 0)
+            if criterio_encontrado.get("perc_especial"):
+                valor_apuracao = valor_base_linha * (float(criterio_encontrado["perc_especial"]) / 100)
+            else:
+                valor_apuracao = valor_base_linha * faixa_pct
 
         linha_dict["valor_apuracao"] = round(valor_apuracao, 2)
         resultado.append(linha_dict)

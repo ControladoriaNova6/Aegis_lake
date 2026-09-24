@@ -32,12 +32,12 @@ def manutencao_sincronizar_valores_campanhas():
 
 
 @bp_manutencao.route("/manutencao/valores-mapeados")
-@requer_papel(["admin", "editor"])
+@requer_papel(["admin", "editor", "visualizador"])
 def manutencao_valores_mapeados():
-    """Usado pelo Cadastro de Campanha pra popular os filtros opcionais
-    de produção (Map Indicado/Convênio/Produto). Aberto a qualquer
-    usuário logado (não só admin), já que Editor também cadastra
-    campanha."""
+    """Usado pelo Cadastro de Campanha e pela Visão geral de Produção pra
+    popular filtros opcionais (Map Indicado/Convênio/Produto). Aberto a
+    qualquer usuário logado com acesso a alguma dessas telas — é só uma
+    lista de valores já tratados, não dado sensível."""
     try:
         return jsonify(listar_valores_mapeados())
     except Exception as exc:  # noqa: BLE001

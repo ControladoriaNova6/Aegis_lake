@@ -21,6 +21,7 @@ from lib.campanhas import (
     CAMPOS_FILTRO_PRODUCAO,
     STATUS_CAMPANHA_VALIDOS,
 )
+from lib.cache import invalidar_tudo
 
 bp_campanhas = Blueprint("campanhas", __name__, url_prefix="/api")
 
@@ -41,11 +42,22 @@ def campanhas_listar():
 @requer_papel(["admin", "editor", "visualizador"])
 def campanhas_atingimento():
     """Campanhas + produção real do período + avaliação de faixa/meta —
-    usado na Visão geral de Campanhas (cards e tabela)."""
+    usado na Visão geral de Campanhas (cards e tabela).
+
+    `forcar=1` limpa o cache de leitura ANTES de calcular — sem isso, o
+    botão "Atualizar agora" da tela só invalidava o cache do React Query
+    no navegador, forçando uma nova requisição, mas o backend tem seu
+    próprio cache em memória (sem expiração por tempo) e continuava
+    devolvendo o mesmo resultado de antes, então a projeção nunca era
+    recalculada de fato com produção nova."""
     banco = request.args.get("banco") or None
     data_inicio = request.args.get("data_inicio") or None
     data_fim = request.args.get("data_fim") or None
     busca_campanha = request.args.get("campanha") or None
+    forcar = request.args.get("forcar") in ("1", "true", "True")
+
+    if forcar:
+        invalidar_tudo()
 
     try:
         linhas = listar_campanhas_com_atingimento(
@@ -73,7 +85,7 @@ def campanhas_relatorio_apuracao_download(id_campanha):
         return jsonify({"erro": str(exc)}), 500
 
     colunas_ordem = [
-        "data_pagamento", "ade", "banco", "convenio", "produto", "cod_tabela", "tabela",
+        "data_pagamento", "ade", "banco", "convenio", "produto", "cod_tabela", "tabela", "prazo",
         "vlr_liquido", "vlr_bruto", "usuario", "cod_corretor", "cod_master", "cod_indicado",
         "valor_apuracao",
     ]
@@ -84,7 +96,7 @@ def campanhas_relatorio_apuracao_download(id_campanha):
     df = df[colunas_ordem].rename(columns={
         "data_pagamento": "Data pagamento", "ade": "ADE (proposta)", "banco": "Banco",
         "convenio": "Convênio", "produto": "Produto", "cod_tabela": "Cód. tabela", "tabela": "Tabela",
-        "vlr_liquido": "Valor líquido", "vlr_bruto": "Valor bruto", "usuario": "Usuário",
+        "prazo": "Prazo", "vlr_liquido": "Valor líquido", "vlr_bruto": "Valor bruto", "usuario": "Usuário",
         "cod_corretor": "Cód. corretor", "cod_master": "Cód. master", "cod_indicado": "Cód. indicado",
         "valor_apuracao": "Valor apuração",
     })
@@ -98,9 +110,10 @@ def campanhas_relatorio_apuracao_download(id_campanha):
         formato_data = workbook.add_format({"num_format": "dd/mm/yyyy"})
         worksheet.set_column("A:A", 14, formato_data)
         worksheet.set_column("B:G", 16)
-        worksheet.set_column("H:I", 16, formato_moeda)
-        worksheet.set_column("J:M", 14)
-        worksheet.set_column("N:N", 16, formato_moeda)
+        worksheet.set_column("H:H", 10)
+        worksheet.set_column("I:J", 16, formato_moeda)
+        worksheet.set_column("K:N", 14)
+        worksheet.set_column("O:O", 16, formato_moeda)
 
     buffer.seek(0)
     nome_campanha = "".join(c if c.isalnum() else "_" for c in (campanha.get("campanha") or "campanha"))
