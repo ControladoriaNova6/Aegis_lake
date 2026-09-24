@@ -6,7 +6,9 @@ import api from "../api/client";
 import PageHeader from "../components/PageHeader";
 import Modal from "../components/Modal";
 import { Settings, Plus, Trash } from "../components/icons";
-import { percentual } from "../utils/format";
+import { percentual, dataBr } from "../utils/format";
+
+const VALOR_VAZIO_MAPEAMENTO = "__vazio__";
 
 const FORM_VAZIO = {
   convenio: "", produto: "", base_producao_criterio: "liquido", tabela: "", descr_tabela: "",
@@ -33,6 +35,11 @@ async function buscarValoresMapeados() {
   return data;
 }
 
+function rotuloCampoMapeado(valor) {
+  if (!valor || valor === VALOR_VAZIO_MAPEAMENTO) return "(vazio)";
+  return valor;
+}
+
 function bloqueado(status) {
   return status === "Finalizada" || status === "Em Apuração";
 }
@@ -42,6 +49,8 @@ export default function CampanhasCriterios() {
   const [filtroBanco, setFiltroBanco] = useState("");
   const [filtroCampanha, setFiltroCampanha] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroDataInicio, setFiltroDataInicio] = useState("");
+  const [filtroDataFim, setFiltroDataFim] = useState("");
   const [modalCampanha, setModalCampanha] = useState(null);
   const [editandoCriterioId, setEditandoCriterioId] = useState(null);
   const [form, setForm] = useState(FORM_VAZIO);
@@ -58,6 +67,10 @@ export default function CampanhasCriterios() {
     if (filtroBanco && c.banco !== filtroBanco) return false;
     if (filtroCampanha && !c.campanha.toLowerCase().includes(filtroCampanha.toLowerCase())) return false;
     if (filtroStatus && c.status !== filtroStatus) return false;
+    // Sobreposição de período — mesma regra da Visão geral: só entra se
+    // o período da campanha tiver alguma interseção com o filtro.
+    if (filtroDataInicio && c.data_fim && c.data_fim < filtroDataInicio) return false;
+    if (filtroDataFim && c.data_inicio && c.data_inicio > filtroDataFim) return false;
     return true;
   });
 
@@ -108,7 +121,14 @@ export default function CampanhasCriterios() {
         novo[campo] = criterio.base_producao_criterio || campanha.base_producao || "liquido";
         return;
       }
-      novo[campo] = criterio[campo] ?? (campo === "status" ? "ativo" : "");
+      let valor = criterio[campo] ?? (campo === "status" ? "ativo" : "");
+      // Critério salvo com o valor antigo "(vazio)" de convênio/produto —
+      // hoje isso é tratado exatamente igual a deixar em branco, então
+      // normaliza aqui pra já ficar salvo como branco na próxima vez.
+      if ((campo === "convenio" || campo === "produto") && valor === VALOR_VAZIO_MAPEAMENTO) {
+        valor = "";
+      }
+      novo[campo] = valor;
     });
     setForm(novo);
     setMensagem(null);
@@ -186,6 +206,14 @@ export default function CampanhasCriterios() {
               <option value="Em Apuração">Em Apuração</option>
             </select>
           </div>
+          <div className="form-row">
+            <label>Período de</label>
+            <input type="date" value={filtroDataInicio} onChange={(e) => setFiltroDataInicio(e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Período até</label>
+            <input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
+          </div>
         </div>
       </div>
 
@@ -201,11 +229,11 @@ export default function CampanhasCriterios() {
         <div className="card table-wrap fade-in">
           <table>
             <thead>
-              <tr><th>Banco</th><th>Campanha</th><th>Status</th><th>Critérios cadastrados</th><th></th></tr>
+              <tr><th>Banco</th><th>Campanha</th><th>Período</th><th>Status</th><th>Critérios cadastrados</th><th></th></tr>
             </thead>
             <tbody>
               {campanhasFiltradas.length === 0 && (
-                <tr><td colSpan={5} className="muted center">Nenhuma campanha encontrada.</td></tr>
+                <tr><td colSpan={6} className="muted center">Nenhuma campanha encontrada.</td></tr>
               )}
               {campanhasFiltradas.map((c) => {
                 const criteriosDela = criteriosDaCampanha(c.id);
@@ -213,6 +241,7 @@ export default function CampanhasCriterios() {
                   <tr key={c.id}>
                     <td className="small">{c.banco}</td>
                     <td className="small">{c.campanha}</td>
+                    <td className="mono small">{dataBr(c.data_inicio)} — {dataBr(c.data_fim)}</td>
                     <td className="small">
                       <span className={`status-dot ${c.status === "Vigente" ? "ok" : c.status === "Finalizada" ? "" : "warn"}`} />
                       {c.status}
@@ -241,14 +270,6 @@ export default function CampanhasCriterios() {
               {editandoCriterioId ? "Editar" : "Novo"} critério — {modalCampanha.campanha}
             </p>
 
-            {bloqueado(modalCampanha.status) && (
-              <p className="muted small" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-                Campanha "{modalCampanha.status}" — não é possível criar, editar ou excluir critérios enquanto ela
-                estiver nesse status (mude o status na tela de Cadastro se precisar mexer). Dá pra consultar os já
-                cadastrados normalmente.
-              </p>
-            )}
-
             <form onSubmit={handleSalvar}>
               <table className="form-table">
                 <tbody>
@@ -256,28 +277,18 @@ export default function CampanhasCriterios() {
                     <td className="form-table-label">Convênio</td>
                     <td>
                       <select value={form.convenio} onChange={(e) => handleChange("convenio", e.target.value)}>
-                        <option value="">Todos</option>
+                        <option value="">(vazio)</option>
                         {opcoesConvenio.map((v) => <option key={v} value={v}>{v}</option>)}
                       </select>
-                      {opcoesConvenio.length === 0 && (
-                        <span className="muted small" style={{ display: "block", marginTop: "0.25rem" }}>
-                          Nenhum valor de Map Convênio disponível ainda (Manutenção → Cruzar dados). Por ora, "Todos" considera toda a produção.
-                        </span>
-                      )}
                     </td>
                   </tr>
                   <tr>
                     <td className="form-table-label">Produto</td>
                     <td>
                       <select value={form.produto} onChange={(e) => handleChange("produto", e.target.value)}>
-                        <option value="">Todos</option>
+                        <option value="">(vazio)</option>
                         {opcoesProduto.map((v) => <option key={v} value={v}>{v}</option>)}
                       </select>
-                      {opcoesProduto.length === 0 && (
-                        <span className="muted small" style={{ display: "block", marginTop: "0.25rem" }}>
-                          Nenhum valor de Map Produto disponível ainda (Manutenção → Cruzar dados). Por ora, "Todos" considera toda a produção.
-                        </span>
-                      )}
                     </td>
                   </tr>
                   <tr>
@@ -298,10 +309,6 @@ export default function CampanhasCriterios() {
                         onChange={(e) => handleChange("tabela", e.target.value)}
                         placeholder="ex: 59855;569856;5895"
                       />
-                      <span className="muted small" style={{ display: "block", marginTop: "0.25rem" }}>
-                        Pra cadastrar vários códigos de uma vez, separe por <span className="mono">;</span> — cada um vira
-                        um critério.
-                      </span>
                     </td>
                   </tr>
                   <tr>
@@ -376,8 +383,8 @@ export default function CampanhasCriterios() {
                     <tbody>
                       {criteriosDaCampanha(modalCampanha.id).map((crit) => (
                         <tr key={crit.id}>
-                          <td className="small">{crit.convenio}</td>
-                          <td className="small">{crit.produto}</td>
+                          <td className="small">{rotuloCampoMapeado(crit.convenio)}</td>
+                          <td className="small">{rotuloCampoMapeado(crit.produto)}</td>
                           <td className="mono small">{crit.tabela}</td>
                           <td className="small">{crit.base_producao_criterio === "bruto" ? "Bruto" : "Líquido"}</td>
                           <td className="mono small">{percentual(crit.perc_especial)}</td>

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
-import { Grid } from "../components/icons";
+import { Grid, DollarSign, Calendar, TrendingUp } from "../components/icons";
 import { brl } from "../utils/format";
 
 async function buscarResumo() {
@@ -20,6 +20,7 @@ export default function ValoresAbertosVisaoGeral() {
     <div className="fade-in">
       <PageHeader
         icon={<Grid />}
+        eyebrow="Painel de valores em aberto"
         title="Valores em aberto — Visão geral"
         subtitle="Panorama de recebimentos pendentes, previstos para hoje e em atraso."
       />
@@ -35,16 +36,25 @@ export default function ValoresAbertosVisaoGeral() {
       {data && !isError && (
         <>
           <div className="kpi-grid">
-            <div className="card kpi-card card-accent-teal">
-              <p className="kpi-label">Total pendente ({data.pendente_qtd} lançamento(s))</p>
+            <div className="card kpi-card card-accent">
+              <div className="kpi-card-header">
+                <p className="kpi-label">Total pendente ({data.pendente_qtd} lançamento(s))</p>
+                <span className="kpi-icon"><DollarSign /></span>
+              </div>
               <p className="kpi-value">{brl(data.pendente_total)}</p>
             </div>
-            <div className="card kpi-card card-accent-blue">
-              <p className="kpi-label">Previsto para hoje</p>
+            <div className="card kpi-card">
+              <div className="kpi-card-header">
+                <p className="kpi-label">Previsto para hoje</p>
+                <span className="kpi-icon"><Calendar /></span>
+              </div>
               <p className="kpi-value">{brl(data.hoje_total)}</p>
             </div>
-            <div className="card kpi-card card-accent-accent">
-              <p className="kpi-label">Em atraso</p>
+            <div className="card kpi-card">
+              <div className="kpi-card-header">
+                <p className="kpi-label">Em atraso</p>
+                <span className="kpi-icon"><TrendingUp /></span>
+              </div>
               <p className="kpi-value" style={{ color: data.atraso_total > 0 ? "var(--red)" : undefined }}>
                 {brl(data.atraso_total)}
               </p>

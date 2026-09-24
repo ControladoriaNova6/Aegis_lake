@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
-import { Megaphone, Refresh } from "../components/icons";
+import { Megaphone, Refresh, DollarSign, TrendingUp, ListIcon } from "../components/icons";
 import { brl, mesBr, mesAtual, percentual, dataBr } from "../utils/format";
 
 async function buscarBancos() {
@@ -27,12 +27,13 @@ function mesParaDataFim(mes) {
   return `${mes}-${String(ultimoDia).padStart(2, "0")}`;
 }
 
-async function buscarAtingimento({ banco, mesInicio, mesFim, campanha }) {
+async function buscarAtingimento({ banco, mesInicio, mesFim, campanha, forcar }) {
   const params = {};
   if (banco) params.banco = banco;
   if (mesInicio) params.data_inicio = mesParaDataInicio(mesInicio);
   if (mesFim) params.data_fim = mesParaDataFim(mesFim);
   if (campanha) params.campanha = campanha;
+  if (forcar) params.forcar = 1;
   const { data } = await api.get("/campanhas/atingimento", { params });
   return data;
 }
@@ -55,6 +56,7 @@ export default function CampanhasVisaoGeral() {
   const [mesFim, setMesFim] = useState(atual);
   const [campanha, setCampanha] = useState("");
   const [filtrosAplicados, setFiltrosAplicados] = useState({ banco: "", mesInicio: atual, mesFim: atual, campanha: "" });
+  const [atualizando, setAtualizando] = useState(false);
 
   // Controles de exibição da tabela — a quantidade de colunas (3 blocos ×
   // várias métricas) quebra visualmente em telas menores, então dá pra
@@ -77,8 +79,25 @@ export default function CampanhasVisaoGeral() {
   });
 
   function handleAtualizar() {
-    setFiltrosAplicados({ banco, mesInicio, mesFim, campanha });
-    queryClient.invalidateQueries({ queryKey: ["campanhas-atingimento"] });
+    const novosFiltros = { banco, mesInicio, mesFim, campanha };
+    setFiltrosAplicados(novosFiltros);
+    setAtualizando(true);
+    // Manda "forcar" pro backend limpar o cache de leitura ANTES de
+    // recalcular — sem isso, o backend tinha seu próprio cache (sem
+    // expiração por tempo) e continuava devolvendo o resultado antigo,
+    // mesmo com produção nova importada. Já escreve o resultado fresco
+    // direto no cache do React Query, então a tela atualiza na hora.
+    buscarAtingimento({ ...novosFiltros, forcar: true })
+      .then((dados) => {
+        queryClient.setQueryData(
+          ["campanhas-atingimento", novosFiltros.banco, novosFiltros.mesInicio, novosFiltros.mesFim, novosFiltros.campanha],
+          dados,
+        );
+      })
+      .catch(() => {
+        queryClient.invalidateQueries({ queryKey: ["campanhas-atingimento"] });
+      })
+      .finally(() => setAtualizando(false));
   }
 
   const mesesDisponiveis = [...meses].sort().reverse();
@@ -88,7 +107,12 @@ export default function CampanhasVisaoGeral() {
 
   return (
     <div className="fade-in">
-      <PageHeader icon={<Megaphone />} title="Campanhas — Visão geral" subtitle="Produção real do período comparada às faixas de meta de cada campanha." />
+      <PageHeader
+        icon={<Megaphone />}
+        eyebrow="Painel de campanhas"
+        title="Campanhas — Visão geral"
+        subtitle="Produção real do período comparada às faixas de meta de cada campanha."
+      />
 
       <div className="card card-fit">
         <p className="section-label">Filtros</p>
@@ -118,8 +142,8 @@ export default function CampanhasVisaoGeral() {
           </div>
           <div className="form-row form-row-action">
             <label>&nbsp;</label>
-            <button type="button" onClick={handleAtualizar}>
-              <Refresh /> Atualizar agora
+            <button type="button" onClick={handleAtualizar} disabled={atualizando}>
+              <Refresh /> {atualizando ? "Atualizando…" : "Atualizar agora"}
             </button>
           </div>
         </div>
@@ -136,16 +160,25 @@ export default function CampanhasVisaoGeral() {
       {!isLoading && !isError && (
         <>
           <div className="kpi-grid">
-            <div className="card kpi-card card-accent-teal">
-              <p className="kpi-label">Soma de valor de campanha (produção no período)</p>
+            <div className="card kpi-card card-accent">
+              <div className="kpi-card-header">
+                <p className="kpi-label">Soma de valor de campanha (produção no período)</p>
+                <span className="kpi-icon"><DollarSign /></span>
+              </div>
               <p className="kpi-value">{brl(somaValorCampanha)}</p>
             </div>
-            <div className="card kpi-card card-accent-blue">
-              <p className="kpi-label">Soma Provisões (projeção até o fim da campanha)</p>
+            <div className="card kpi-card">
+              <div className="kpi-card-header">
+                <p className="kpi-label">Soma Provisões (projeção até o fim da campanha)</p>
+                <span className="kpi-icon"><TrendingUp /></span>
+              </div>
               <p className="kpi-value">{brl(somaProvisoes)}</p>
             </div>
-            <div className="card kpi-card card-accent-accent">
-              <p className="kpi-label">Campanhas Ativas</p>
+            <div className="card kpi-card">
+              <div className="kpi-card-header">
+                <p className="kpi-label">Campanhas Ativas</p>
+                <span className="kpi-icon"><ListIcon /></span>
+              </div>
               <p className="kpi-value">{ativas.length}</p>
             </div>
           </div>

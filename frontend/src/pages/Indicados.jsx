@@ -345,11 +345,6 @@ export default function Indicados() {
         </div>
       </div>
 
-      <p className="muted small" style={{ margin: "0.75rem 0 1.5rem" }}>
-        Só entra aqui produção de indicados já cadastrados — quem ainda não passou pelo cruzamento de dados em
-        Manutenção não aparece.
-      </p>
-
       {carregandoDetalhamento && <div className="skeleton-block" />}
       {erroDetalhamento && (
         <div className="card error-card">

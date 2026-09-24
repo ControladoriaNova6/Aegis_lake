@@ -15,6 +15,7 @@ import CampanhasCriterios from "./pages/CampanhasCriterios";
 import CriteriosHistorico from "./pages/CriteriosHistorico";
 import AdminUsuarios from "./pages/AdminUsuarios";
 import Manutencao from "./pages/Manutencao";
+import Mapeamento from "./pages/Mapeamento";
 import ValoresAbertosVisaoGeral from "./pages/ValoresAbertosVisaoGeral";
 import ValoresAbertosCadastro from "./pages/ValoresAbertosCadastro";
 import ValoresAbertosAcompanhamento from "./pages/ValoresAbertosAcompanhamento";
@@ -74,6 +75,10 @@ export default function App() {
         <Route
           path="/admin/manutencao"
           element={<ProtectedRoute papeis={["admin"]}><Manutencao /></ProtectedRoute>}
+        />
+        <Route
+          path="/admin/mapeamento"
+          element={<ProtectedRoute papeis={["admin"]}><Mapeamento /></ProtectedRoute>}
         />
 
         <Route

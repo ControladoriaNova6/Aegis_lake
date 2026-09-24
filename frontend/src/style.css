@@ -401,9 +401,10 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.card-accent-teal { border-left: 3px solid var(--teal); }
+.card-accent { border-left: 3px solid var(--primary); }
+.card-accent-teal { border-left: 3px solid var(--primary); }
 .card-accent-blue { border-left: 3px solid var(--primary); }
-.card-accent-accent { border-left: 3px solid var(--warning); }
+.card-accent-accent { border-left: 3px solid var(--primary); }
 
 .card-hero {
   background: var(--surface-alt);
@@ -497,6 +498,37 @@ body {
 
 .kpi-card { margin-bottom: 0; }
 
+.kpi-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.kpi-icon svg { width: 15px; height: 15px; }
+
+.kpi-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.kpi-badge.up { background: var(--teal-soft); color: var(--teal); }
+.kpi-badge.down { background: var(--red-soft); color: var(--red); }
+
 .kpi-label {
   text-transform: uppercase;
   font-size: 0.7rem;
@@ -514,6 +546,61 @@ body {
   margin: 0.4rem 0 0;
 }
 
+/* ── participação (barras de progresso ao lado de um gráfico) ───────── */
+.participacao-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.participacao-item-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.participacao-nome {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.participacao-pct {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.participacao-barra-trilha {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  margin: 0.35rem 0 0.15rem;
+  overflow: hidden;
+}
+
+.participacao-barra-preenchida {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.participacao-valor {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── eyebrow (categoria acima do título da página) ───────────────────── */
+.page-eyebrow {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+  margin: 0 0 0.2rem;
+}
+
 /* ── tables ───────────────────────────────────────────────────────────── */
 table {
   width: 100%;
@@ -523,12 +610,15 @@ table {
 
 th {
   text-align: left;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--muted);
   padding-bottom: 0.5rem;
   position: sticky;
   top: 0;
   background: var(--surface);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
 }
 
 td {

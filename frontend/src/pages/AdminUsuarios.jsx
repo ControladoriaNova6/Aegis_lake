@@ -163,13 +163,6 @@ export default function AdminUsuarios() {
         </div>
       </form>
 
-      <p className="muted small" style={{ margin: "0 0 1.5rem" }}>
-        Ao cadastrar um usuário novo sem senha, a pessoa acessa a tela de login e usa "Primeiro acesso" com o
-        e-mail cadastrado aqui pra criar a própria senha. Clique no ícone de editar numa linha da tabela pra
-        carregar os dados dela aqui em cima (o e-mail não pode ser trocado numa edição — pra isso, exclua e
-        cadastre de novo).
-      </p>
-
       {isLoading && <div className="skeleton-block" />}
       {isError && (
         <div className="card error-card">

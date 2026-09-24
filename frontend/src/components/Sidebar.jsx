@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
+import { APP_VERSION } from "../version";
 import {
   Grid,
   Upload,
@@ -12,6 +13,7 @@ import {
   Users,
   DollarSign,
   Plus,
+  Table,
 } from "./icons";
 
 const PRODUCAO_PATHS = ["/", "/importar", "/logs", "/relatorio", "/parametros"];
@@ -33,6 +35,7 @@ const PAPEIS_POR_ROTA = {
   "/valores-abertos/acompanhamento": ["admin", "editor", "valores_abertos"],
   "/admin/usuarios": ["admin"],
   "/admin/manutencao": ["admin"],
+  "/admin/mapeamento": ["admin"],
 };
 
 function podeVer(rota, papel) {
@@ -117,9 +120,14 @@ export default function Sidebar() {
             <div className="sidenav-divider">ADMIN</div>
             <Item to="/admin/usuarios" icon={<Users />} papel={papel}>Usuários</Item>
             <Item to="/admin/manutencao" icon={<Settings />} papel={papel}>Manutenção</Item>
+            <Item to="/admin/mapeamento" icon={<Table />} papel={papel}>Mapeamento</Item>
           </>
         )}
       </nav>
+
+      <div className="sidebar-footer">
+        <p className="user-papel" style={{ padding: "0 0.5rem" }}>AEGIS · v{APP_VERSION}</p>
+      </div>
     </aside>
   );
 }

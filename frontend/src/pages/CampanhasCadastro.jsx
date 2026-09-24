@@ -333,9 +333,6 @@ export default function CampanhasCadastro() {
         </div>
 
         <p className="section-label" style={{ marginTop: "1rem" }}>Faixas e metas (bônus por faixa atingida)</p>
-        <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-          Meta = produção (R$) que precisa ser alcançada. Faixa = percentual de bônus pago quando essa meta é batida.
-        </p>
         {form.faixas_metas.map((fm, index) => (
           <div className="filter-grid fade-in" key={index} style={{ marginBottom: "0.5rem", alignItems: "flex-end" }}>
             <div className="form-row">
@@ -360,9 +357,6 @@ export default function CampanhasCadastro() {
 
         <p className="section-label" style={{ marginTop: "1rem" }}>
           Qual produção conta pro atingimento de meta (opcional)
-        </p>
-        <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-          Sem seleção, considera toda a produção do banco no período.
         </p>
         <div className="filter-grid">
           <div className="form-row">
@@ -510,9 +504,6 @@ export default function CampanhasCadastro() {
                   <td className="form-table-label">Valor previsto</td>
                   <td>
                     <input type="text" value={brl(formValoresAbertos.valor)} disabled title="Valor previsto atual da campanha (não editável) — vem do cenário de Projeção da Visão geral." />
-                    <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-                      Puxado automaticamente da projeção atual da campanha — não é digitado aqui.
-                    </p>
                   </td>
                 </tr>
                 <tr>
@@ -536,10 +527,6 @@ export default function CampanhasCadastro() {
         <Modal onClose={fecharModalRenovar} width={420}>
           <p className="section-title" style={{ marginTop: 0 }}>
             Renovar campanha — {modalRenovar.campanha}
-          </p>
-          <p className="muted small">
-            Cria uma campanha nova, com o período abaixo, copiando as faixas/metas e todos os
-            critérios já cadastrados em "{modalRenovar.campanha}". A campanha original não é alterada.
           </p>
 
           {mensagemRenovar && (

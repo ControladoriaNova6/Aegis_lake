@@ -1,7 +1,8 @@
-export default function PageHeader({ icon, title, subtitle, action }) {
+export default function PageHeader({ icon, eyebrow, title, subtitle, action }) {
   return (
     <header className="page-header">
       <div>
+        {eyebrow && <p className="page-eyebrow">{eyebrow}</p>}
         <h1 className="page-title">
           <span className="page-title-icon">{icon}</span>
           {title}

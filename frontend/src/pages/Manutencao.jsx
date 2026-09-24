@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
@@ -48,12 +49,6 @@ export default function Manutencao() {
 
       <div className="card">
         <p className="section-title" style={{ marginTop: 0 }}>Map Indicado</p>
-        <p className="muted small" style={{ marginBottom: "1rem" }}>
-          Procura em <span className="mono">cod_corretor</span>, <span className="mono">cod_master</span> e{" "}
-          <span className="mono">cod_indicado</span> por um código que bata com algum indicado cadastrado. Quando
-          bate, grava esse código na coluna <span className="mono">map_indicado</span>. Só processa linhas que ainda
-          não têm essa coluna preenchida — rodar de novo depois de cadastrar novos indicados é seguro.
-        </p>
         <button type="button" onClick={() => cruzarIndicadoMutation.mutate()} disabled={cruzarIndicadoMutation.isPending}>
           {cruzarIndicadoMutation.isPending ? "Cruzando…" : "Rodar cruzamento — Map Indicado"}
         </button>
@@ -61,22 +56,13 @@ export default function Manutencao() {
 
       <div className="card">
         <p className="section-title" style={{ marginTop: 0 }}>Map Convênio / Map Produto</p>
-        <p className="muted small" style={{ marginBottom: "1rem" }}>
-          Em desenvolvimento, seguindo o mesmo padrão do Map Indicado.
-        </p>
-        <button type="button" disabled title="Em breve">
-          Em breve
-        </button>
+        <Link to="/admin/mapeamento" className="btn-link">
+          <Settings /> Ir para Mapeamento
+        </Link>
       </div>
 
       <div className="card">
         <p className="section-title" style={{ marginTop: 0 }}>Sincronizar valores de campanhas</p>
-        <p className="muted small" style={{ marginBottom: "1rem" }}>
-          Atualiza todo lançamento em <span className="mono">Valores em Aberto</span> que veio do botão "Adicionar
-          aos valores em aberto" de uma campanha, recalculando o valor previsto (e a data prevista) com a projeção
-          mais atual dessa campanha. Lançamentos já marcados como "recebido" não são alterados. Rode isso sempre que
-          a produção subjacente às campanhas for atualizada (nova importação de base, por exemplo).
-        </p>
         <button
           type="button"
           onClick={() => sincronizarValoresCampanhasMutation.mutate()}
